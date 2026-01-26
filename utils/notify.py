@@ -595,15 +595,28 @@ class NotificationManager:
         linuxdo_results = [r for r in results if "LinuxDo" in r.get("platform", "")]
         anyrouter_results = [r for r in results if "AnyRouter" in r.get("platform", "")]
         
-        # 标题
-        if failed_count == 0:
-            title = "✅ 多平台签到完成"
+        # 判断有哪些平台
+        has_linuxdo = len(linuxdo_results) > 0
+        has_anyrouter = len(anyrouter_results) > 0
+        
+        # 生成标题
+        if has_linuxdo and has_anyrouter:
+            platform_name = "AnyRouter+LinuxDO"
+        elif has_linuxdo:
+            platform_name = "LinuxDO"
+        elif has_anyrouter:
+            platform_name = "AnyRouter"
         else:
-            title = "⚠️ 多平台签到完成"
+            platform_name = "签到"
+        
+        if failed_count == 0:
+            title = f"✅ {platform_name}签到完成"
+        else:
+            title = f"❌ {platform_name}签到失败"
         
         # 内容
         lines = [
-            f"[TIME] Execution time: {timestamp.strftime('%Y-%m-%d %H:%M:%S')}",
+            f"[时间] {timestamp.strftime('%Y-%m-%d %H:%M:%S')}",
             "",
         ]
         
@@ -617,10 +630,10 @@ class NotificationManager:
                 if status == "success" and details:
                     balance = details.get("balance", "N/A")
                     used = details.get("used", "N/A")
-                    lines.append(f"[BALANCE] {account}")
-                    lines.append(f":money: Current balance: {balance}, Used: {used}")
+                    lines.append(f"[余额] {account}")
+                    lines.append(f"💰 当前余额: {balance}, 已使用: {used}")
                 elif status == "failed":
-                    lines.append(f"[FAILED] {account}: {result.get('message', 'Unknown error')}")
+                    lines.append(f"[失败] {account}: {result.get('message', '未知错误')}")
             lines.append("")
         
         # LinuxDo 结果
@@ -631,9 +644,9 @@ class NotificationManager:
                 message = result.get("message", "")
                 
                 if status == "success":
-                    lines.append(f"[LINUXDO] {account}: {message}")
+                    lines.append(f"[LinuxDO] {account}: {message}")
                 elif status == "failed":
-                    lines.append(f"[FAILED] {account}: {message}")
+                    lines.append(f"[失败] {account}: {message}")
             lines.append("")
             
             # 显示热门话题
@@ -660,14 +673,14 @@ class NotificationManager:
                     break  # 只显示一次热门话题
         
         # 统计信息
-        lines.append("[STATS] Check-in result statistics:")
-        lines.append(f"[SUCCESS] Success: {success_count}/{total_count}")
-        lines.append(f"[FAIL] Failed: {failed_count}/{total_count}")
+        lines.append("[统计] 签到结果:")
+        lines.append(f"[成功] {success_count}/{total_count}")
+        lines.append(f"[失败] {failed_count}/{total_count}")
         
         if failed_count == 0:
-            lines.append("[SUCCESS] All accounts check-in successful!")
+            lines.append("[完成] 全部账号签到成功!")
         else:
-            lines.append(f"[WARNING] {failed_count} account(s) failed!")
+            lines.append(f"[警告] {failed_count} 个账号签到失败!")
         
         content = "\n".join(lines)
         
