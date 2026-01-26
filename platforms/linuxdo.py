@@ -340,8 +340,8 @@ class LinuxDoAdapter(BasePlatformAdapter):
         
         logger.info(f"发现 {len(topic_list)} 个主题帖，随机选择浏览")
         
-        # 随机选择 10-15 个帖子
-        browse_count = random.randint(10, 15)
+        # 随机选择 5-15 个帖子
+        browse_count = random.randint(5, 15)
         for topic in random.sample(topic_list, min(browse_count, len(topic_list))):
             self._click_one_topic(topic.attr("href"))
         
