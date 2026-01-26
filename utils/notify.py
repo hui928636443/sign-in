@@ -54,7 +54,8 @@ class NotificationManager:
         # Gotify 配置
         self.gotify_url = os.getenv("GOTIFY_URL")
         self.gotify_token = os.getenv("GOTIFY_TOKEN")
-        self.gotify_priority = int(os.getenv("GOTIFY_PRIORITY", "9"))
+        gotify_priority_str = os.getenv("GOTIFY_PRIORITY") or "9"
+        self.gotify_priority = int(gotify_priority_str) if gotify_priority_str else 9
         
         # Server酱³ 配置
         self.sc3_push_key = os.getenv("SC3_PUSH_KEY")
