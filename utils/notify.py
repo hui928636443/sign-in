@@ -638,7 +638,7 @@ class NotificationManager:
             
             # 显示热门话题
             for result in linuxdo_results:
-                details = result.get("details", {})
+                details = result.get("details") or {}
                 hot_topics = details.get("hot_topics", [])
                 if hot_topics:
                     lines.append("🔥 [HOT TOPICS] LinuxDo 热门帖子:")
