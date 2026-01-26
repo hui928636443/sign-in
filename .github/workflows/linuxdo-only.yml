@@ -1,10 +1,7 @@
 name: LinuxDo Only Check-in
 
 on:
-  schedule:
-    - cron: '0 */12 * * *'  # 每12小时执行一次
-
-  workflow_dispatch:
+  workflow_dispatch:  # 仅手动触发（测试用）
 
 jobs:
   linuxdo-checkin:
