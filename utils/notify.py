@@ -174,7 +174,8 @@ class NotificationManager:
         if not self.email_user or not self.email_pass or not self.email_to:
             raise ValueError("Email 配置不完整")
         
-        sender = self.email_sender or self.email_user
+        # 发件人显示名称
+        sender_name = self.email_sender if self.email_sender else "Sign-in Bot"
         
         # 创建邮件
         if msg_type == "html":
@@ -183,7 +184,7 @@ class NotificationManager:
         else:
             msg = MIMEText(content, "plain", "utf-8")
         
-        msg["From"] = f"{sender} <{self.email_user}>"
+        msg["From"] = f"{sender_name} <{self.email_user}>"
         msg["To"] = self.email_to
         msg["Subject"] = title
         
@@ -637,6 +638,29 @@ class NotificationManager:
                 elif status == "failed":
                     lines.append(f"[FAILED] {account}: {message}")
             lines.append("")
+            
+            # 显示热门话题
+            for result in linuxdo_results:
+                details = result.get("details", {})
+                hot_topics = details.get("hot_topics", [])
+                if hot_topics:
+                    lines.append("🔥 [HOT TOPICS] LinuxDo 热门帖子:")
+                    for i, topic in enumerate(hot_topics[:10], 1):
+                        title = topic.get("title", "")
+                        views = topic.get("views", 0)
+                        replies = topic.get("replies", 0)
+                        url = topic.get("url", "")
+                        # 格式化浏览量
+                        if views >= 10000:
+                            views_str = f"{views/10000:.1f}万"
+                        elif views >= 1000:
+                            views_str = f"{views/1000:.1f}k"
+                        else:
+                            views_str = str(views)
+                        lines.append(f"  {i}. {title}")
+                        lines.append(f"     👁 {views_str} | 💬 {replies} | {url}")
+                    lines.append("")
+                    break  # 只显示一次热门话题
         
         # 统计信息
         lines.append("[STATS] Check-in result statistics:")

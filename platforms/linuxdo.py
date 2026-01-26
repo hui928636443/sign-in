@@ -62,6 +62,7 @@ class LinuxDoAdapter(BasePlatformAdapter):
         self.page = None
         self.session: Optional[requests.Session] = None
         self._connect_info: Optional[dict] = None
+        self._hot_topics: list[dict] = []  # 存储热门话题
     
     @property
     def platform_name(self) -> str:
@@ -223,6 +224,11 @@ class LinuxDoAdapter(BasePlatformAdapter):
         # 添加 Connect 信息到详情
         if self._connect_info:
             details["connect_info"] = self._connect_info
+        
+        # 收集热门话题
+        self._collect_hot_topics()
+        if self._hot_topics:
+            details["hot_topics"] = self._hot_topics
         
         if not self.browse_enabled:
             return CheckinResult(
@@ -408,3 +414,85 @@ class LinuxDoAdapter(BasePlatformAdapter):
                 logger.info("帖子可能已经点过赞了")
         except Exception as e:
             logger.error(f"点赞失败: {e}")
+    
+    def _collect_hot_topics(self) -> None:
+        """收集热门话题（按浏览量排序的新帖子）"""
+        logger.info("收集热门话题...")
+        self._hot_topics = []
+        
+        try:
+            # 获取话题列表区域
+            list_area = self.page.ele("@id=list-area")
+            if not list_area:
+                logger.warning("未找到话题列表区域")
+                return
+            
+            # 获取所有话题行
+            topic_rows = list_area.eles("tag:tr")
+            
+            for row in topic_rows:
+                try:
+                    # 获取标题链接
+                    title_link = row.ele(".:title")
+                    if not title_link:
+                        continue
+                    
+                    title = title_link.text.strip()
+                    url = title_link.attr("href")
+                    if not url.startswith("http"):
+                        url = f"https://linux.do{url}"
+                    
+                    # 获取浏览量 (views 列)
+                    views_ele = row.ele(".:views")
+                    views_text = views_ele.text.strip() if views_ele else "0"
+                    views = self._parse_number(views_text)
+                    
+                    # 获取回复数 (replies 列)
+                    replies_ele = row.ele(".:replies")
+                    replies_text = replies_ele.text.strip() if replies_ele else "0"
+                    replies = self._parse_number(replies_text)
+                    
+                    # 获取分类
+                    category_ele = row.ele(".:category-name")
+                    category = category_ele.text.strip() if category_ele else ""
+                    
+                    if title and views > 0:
+                        self._hot_topics.append({
+                            "title": title[:50] + "..." if len(title) > 50 else title,
+                            "url": url,
+                            "views": views,
+                            "replies": replies,
+                            "category": category,
+                        })
+                except Exception:
+                    continue
+            
+            # 按浏览量排序，取 Top 10
+            self._hot_topics.sort(key=lambda x: x["views"], reverse=True)
+            self._hot_topics = self._hot_topics[:10]
+            
+            logger.info(f"收集到 {len(self._hot_topics)} 个热门话题")
+            
+        except Exception as e:
+            logger.warning(f"收集热门话题失败: {e}")
+    
+    def _parse_number(self, text: str) -> int:
+        """解析数字文本（支持 1.2k, 3.5万 等格式）"""
+        text = text.strip().lower()
+        if not text:
+            return 0
+        
+        try:
+            # 处理 k/K 后缀 (千)
+            if "k" in text:
+                return int(float(text.replace("k", "")) * 1000)
+            # 处理 万 后缀
+            if "万" in text:
+                return int(float(text.replace("万", "")) * 10000)
+            # 处理 m/M 后缀 (百万)
+            if "m" in text:
+                return int(float(text.replace("m", "")) * 1000000)
+            # 普通数字
+            return int(text.replace(",", ""))
+        except (ValueError, AttributeError):
+            return 0
