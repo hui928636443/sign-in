@@ -113,8 +113,8 @@
 | `GOTIFY_URL` | Gotify 服务器地址 |
 | `GOTIFY_TOKEN` | Gotify 应用 Token |
 | `GOTIFY_PRIORITY` | 消息优先级（可选，默认 9） |
-| **Server酱³** | |
-| `SC3_PUSH_KEY` | Server酱³ SendKey |
+| **Server酱 Turbo (SCT)** | |
+| `SC3_PUSH_KEY` | Server酱 Turbo SendKey (从 https://sct.ftqq.com/sendkey 获取) |
 | **wxpush** | |
 | `WXPUSH_URL` | wxpush 服务器地址 |
 | `WXPUSH_TOKEN` | wxpush Token |
@@ -180,7 +180,7 @@ uv run python main.py --debug
    **可选配置（通知，选一个即可）：**
    - `TELEGRAM_BOT_TOKEN` + `TELEGRAM_CHAT_ID` - Telegram 通知
    - `PUSHPLUS_TOKEN` - PushPlus 微信通知
-   - `SC3_PUSH_KEY` - Server酱³ 通知
+   - `SC3_PUSH_KEY` - Server酱 Turbo 通知 (https://sct.ftqq.com/sendkey)
 
 3. 进入 `Actions` 选项卡，点击 `I understand my workflows, go ahead and enable them` 启用工作流
 4. 工作流会按计划自动运行（每12小时一次）

@@ -243,28 +243,25 @@ class NotificationManager:
         content: str,
         msg_type: Literal["text", "html"] = "text"
     ):
-        """发送 Server酱³ 通知
+        """发送 Server酱 Turbo (SCT) 通知
         
         环境变量:
-        - SC3_PUSH_KEY: Server酱³ SendKey (格式: sct{uid}t...)
+        - SC3_PUSH_KEY: Server酱 Turbo SendKey (格式: SCTxxxxx)
+        
+        API: https://sctapi.ftqq.com/{SENDKEY}.send
         """
         if not self.sc3_push_key:
-            raise ValueError("Server酱³ 配置不完整")
+            raise ValueError("Server酱 配置不完整")
         
-        # 从 SendKey 中提取 UID
-        match = re.match(r"sct(\d+)t", self.sc3_push_key, re.I)
-        if not match:
-            raise ValueError("SC3_PUSH_KEY 格式错误，无法提取 UID")
+        # Server酱 Turbo API
+        url = f"https://sctapi.ftqq.com/{self.sc3_push_key}.send"
         
-        uid = match.group(1)
-        url = f"https://{uid}.push.ft07.com/send/{self.sc3_push_key}"
-        
-        params = {
-            "title": title,
+        payload = {
+            "title": title[:32],  # 标题最大32字符
             "desp": content,
         }
         
-        response = self.client.get(url, params=params)
+        response = self.client.post(url, data=payload)
         response.raise_for_status()
     
     def _send_wxpush(
