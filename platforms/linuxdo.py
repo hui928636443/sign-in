@@ -361,12 +361,15 @@ class LinuxDoAdapter(BasePlatformAdapter):
         topic_urls = []
         for row in topic_rows:
             try:
-                # 检查分类
-                category_ele = await row.query_selector(".category-name")
-                if category_ele:
-                    category = await category_ele.inner_text()
-                    if category.strip() in self.BLOCKED_CATEGORIES:
-                        continue
+                # 获取整行文本，检查是否包含屏蔽分类
+                row_text = await row.inner_text()
+                should_skip = False
+                for blocked in self.BLOCKED_CATEGORIES:
+                    if blocked in row_text:
+                        should_skip = True
+                        break
+                if should_skip:
+                    continue
                 
                 # 获取链接
                 title_link = await row.query_selector(".title")
@@ -484,13 +487,14 @@ class LinuxDoAdapter(BasePlatformAdapter):
                     if url and not url.startswith("http"):
                         url = f"https://linux.do{url}"
                     
-                    # 获取分类
-                    category_ele = await row.query_selector(".category-name")
-                    category = await category_ele.inner_text() if category_ele else ""
-                    category = category.strip()
-                    
-                    # 跳过屏蔽的分类
-                    if category in self.BLOCKED_CATEGORIES:
+                    # 获取整行文本，检查是否包含屏蔽分类
+                    row_text = await row.inner_text()
+                    should_skip = False
+                    for blocked in self.BLOCKED_CATEGORIES:
+                        if blocked in row_text:
+                            should_skip = True
+                            break
+                    if should_skip:
                         continue
                     
                     # 获取浏览量
@@ -509,7 +513,6 @@ class LinuxDoAdapter(BasePlatformAdapter):
                             "url": url,
                             "views": views,
                             "replies": replies,
-                            "category": category,
                         })
                 except Exception:
                     continue
