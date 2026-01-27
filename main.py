@@ -56,7 +56,7 @@ def parse_args() -> argparse.Namespace:
     
     parser.add_argument(
         "--platform", "-p",
-        choices=["linuxdo", "anyrouter"],
+        choices=["linuxdo", "anyrouter", "wong"],
         help="指定要运行的平台（默认运行所有平台）",
     )
     

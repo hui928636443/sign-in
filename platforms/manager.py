@@ -148,12 +148,15 @@ class PlatformManager:
         )
     
     async def _run_all_wong(self) -> list[CheckinResult]:
-        """运行所有 WONG 公益站账号签到"""
-        if not self.config.wong_accounts:
-            logger.info("WONG 公益站未配置")
-            return []
+        """运行所有 WONG 公益站账号签到
         
+        包括：
+        1. WONG_ACCOUNTS 环境变量配置的账号
+        2. ANYROUTER_ACCOUNTS 中 provider=wong 的账号
+        """
         results = []
+        
+        # 1. 处理 WONG_ACCOUNTS 配置的账号
         for i, account in enumerate(self.config.wong_accounts):
             logger.info(f"开始执行 WONG 账号 {i + 1}: {account.get_display_name(i)}")
             
@@ -176,6 +179,34 @@ class PlatformManager:
                     status=CheckinStatus.FAILED,
                     message=f"执行异常: {str(e)}",
                 ))
+        
+        # 2. 处理 ANYROUTER_ACCOUNTS 中 provider=wong 的账号
+        wong_from_anyrouter = [acc for acc in self.config.anyrouter_accounts if acc.provider == "wong"]
+        for i, account in enumerate(wong_from_anyrouter):
+            logger.info(f"开始执行 WONG 账号 (from ANYROUTER): {account.get_display_name(i)}")
+            
+            session_cookie = self._extract_session_cookie(account.cookies)
+            
+            adapter = WongAdapter(
+                fallback_cookies=session_cookie,
+                api_user=account.api_user,
+                account_name=account.get_display_name(i),
+            )
+            
+            try:
+                result = await adapter.run()
+                results.append(result)
+            except Exception as e:
+                logger.error(f"WONG 账号 {account.get_display_name(i)} 执行异常: {e}")
+                results.append(CheckinResult(
+                    platform="WONG公益站",
+                    account=account.get_display_name(i),
+                    status=CheckinStatus.FAILED,
+                    message=f"执行异常: {str(e)}",
+                ))
+        
+        if not results:
+            logger.info("WONG 公益站未配置")
         
         return results
     
