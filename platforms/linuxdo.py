@@ -80,38 +80,59 @@ class LinuxDoAdapter(BasePlatformAdapter):
         return self._account_name if self._account_name else self.username
     
     def _get_random_user_agent(self) -> str:
-        """生成随机 User-Agent（模拟不同的 Chrome 版本和系统）"""
+        """生成随机 User-Agent（模拟不同的 Chrome 版本和系统）
+
+        注意：版本号需要定期更新以匹配当前主流浏览器版本
+        """
+        # 2025年1月主流 Chrome 版本（保持更新）
         chrome_versions = [
-            "120.0.0.0", "121.0.0.0", "122.0.0.0", "123.0.0.0", "124.0.0.0",
-            "125.0.0.0", "126.0.0.0", "127.0.0.0", "128.0.0.0", "129.0.0.0",
-            "130.0.0.0", "131.0.0.0", "132.0.0.0",
+            "128.0.0.0", "129.0.0.0", "130.0.0.0", "131.0.0.0", "132.0.0.0",
+            "133.0.0.0", "134.0.0.0", "135.0.0.0", "136.0.0.0",
         ]
-        
+
         # Windows 10/11 的不同版本
         windows_versions = [
-            "Windows NT 10.0; Win64; x64",
-            "Windows NT 10.0; WOW64",
+            "Windows NT 10.0; Win64; x64",  # Windows 10/11 64位
         ]
-        
+
+        # macOS 版本（增加多样性）
+        macos_versions = [
+            "Macintosh; Intel Mac OS X 10_15_7",
+            "Macintosh; Intel Mac OS X 11_6_0",
+            "Macintosh; Intel Mac OS X 12_6_0",
+            "Macintosh; Intel Mac OS X 13_4_0",
+            "Macintosh; Intel Mac OS X 14_0_0",
+        ]
+
         chrome_ver = random.choice(chrome_versions)
-        win_ver = random.choice(windows_versions)
-        
+
+        # 70% Windows, 30% macOS
+        if random.random() < 0.7:
+            os_ver = random.choice(windows_versions)
+        else:
+            os_ver = random.choice(macos_versions)
+
         return (
-            f"Mozilla/5.0 ({win_ver}) AppleWebKit/537.36 "
+            f"Mozilla/5.0 ({os_ver}) AppleWebKit/537.36 "
             f"(KHTML, like Gecko) Chrome/{chrome_ver} Safari/537.36"
         )
     
     def _get_random_viewport(self) -> dict:
-        """生成随机 viewport 尺寸（模拟不同的屏幕分辨率）"""
+        """生成随机 viewport 尺寸（模拟不同的屏幕分辨率）
+
+        注意：避免使用 1280x720，这是 Playwright 默认值，容易被检测
+        """
         viewports = [
-            {"width": 1920, "height": 1080},  # 1080p
+            {"width": 1920, "height": 1080},  # 1080p（最常见）
+            {"width": 1920, "height": 1080},  # 权重加倍
             {"width": 1366, "height": 768},   # 常见笔记本
             {"width": 1536, "height": 864},   # 缩放后的 1080p
             {"width": 1440, "height": 900},   # MacBook
             {"width": 1600, "height": 900},   # 16:9 宽屏
             {"width": 1680, "height": 1050},  # 16:10 宽屏
-            {"width": 1280, "height": 720},   # 720p
             {"width": 1280, "height": 800},   # 常见笔记本
+            {"width": 1512, "height": 982},   # MacBook Pro 14"
+            {"width": 1728, "height": 1117},  # MacBook Pro 16"
         ]
         return random.choice(viewports)
     
@@ -156,6 +177,11 @@ class LinuxDoAdapter(BasePlatformAdapter):
     
     async def login(self) -> bool:
         """执行登录操作"""
+        # 启动前随机预热延迟（1-5秒），模拟人类打开浏览器的准备时间
+        warmup_delay = random.uniform(1.0, 5.0)
+        logger.debug(f"预热延迟 {warmup_delay:.1f} 秒...")
+        await asyncio.sleep(warmup_delay)
+
         logger.info("开始登录 LinuxDo")
         
         await self._init_browser()
@@ -674,47 +700,67 @@ class LinuxDoAdapter(BasePlatformAdapter):
     
     async def _browse_post_fallback(self, page: Page) -> None:
         """回退的滚动浏览模式（当无法获取楼层元素时使用）
-        
-        使用随机滚动距离和停留时间，偶尔回滚模拟真实用户
+
+        使用平滑滚动和随机停留时间，偶尔回滚模拟真实用户
+
+        反检测策略：
+        - 使用 smooth 平滑滚动代替瞬间跳转
+        - 随机滚动距离和停留时间
+        - 偶尔回滚模拟回看行为
         """
         start_time = time.time()
         min_browse_time = random.uniform(8, 15)
         scroll_count = 0
-        
+
         for _ in range(15):
             # 随机滚动距离（模拟不同的滚动习惯）
             scroll_distance = random.randint(300, 800)
-            await page.evaluate(f"window.scrollBy(0, {scroll_distance})")
+
+            # 使用平滑滚动（更自然，不易被检测）
+            await page.evaluate(f"""
+                window.scrollBy({{
+                    top: {scroll_distance},
+                    behavior: 'smooth'
+                }})
+            """)
             scroll_count += 1
-            
+
+            # 等待平滑滚动完成
+            await asyncio.sleep(random.uniform(0.3, 0.6))
+
             # 随机停留时间
             if random.random() < 0.2:
                 # 20% 概率停留更久（仔细阅读）
                 await asyncio.sleep(random.uniform(3.5, 6.0))
             else:
                 await asyncio.sleep(random.uniform(2.0, 4.0))
-            
+
             # 10% 概率回滚一点（模拟回看）
             if scroll_count > 2 and random.random() < 0.1:
                 back_distance = random.randint(150, 400)
-                await page.evaluate(f"window.scrollBy(0, -{back_distance})")
+                await page.evaluate(f"""
+                    window.scrollBy({{
+                        top: -{back_distance},
+                        behavior: 'smooth'
+                    }})
+                """)
                 await asyncio.sleep(random.uniform(1.0, 2.5))
-            
+
             # 随机鼠标移动
             if random.random() < 0.4:
                 viewport = await page.evaluate("({w: window.innerWidth, h: window.innerHeight})")
                 x = random.uniform(100, viewport["w"] - 100)
                 y = random.uniform(100, viewport["h"] - 100)
                 await page.mouse.move(x, y)
-            
+
             elapsed = time.time() - start_time
             at_bottom = await page.evaluate(
                 "window.scrollY + window.innerHeight >= document.body.scrollHeight - 50"
             )
-            
+
             if at_bottom and elapsed >= min_browse_time:
                 break
-            
+
             # 5% 概率提前退出
             if elapsed > 6 and random.random() < 0.05:
                 break
