@@ -602,18 +602,24 @@ class NotificationManager:
         # 按平台分组
         linuxdo_results = [r for r in results if "LinuxDo" in r.get("platform", "")]
         anyrouter_results = [r for r in results if "AnyRouter" in r.get("platform", "")]
+        wong_results = [r for r in results if "WONG" in r.get("platform", "")]
         
         # 判断有哪些平台
         has_linuxdo = len(linuxdo_results) > 0
         has_anyrouter = len(anyrouter_results) > 0
+        has_wong = len(wong_results) > 0
         
         # 生成标题
-        if has_linuxdo and has_anyrouter:
-            platform_name = "AnyRouter+LinuxDO"
-        elif has_linuxdo:
-            platform_name = "LinuxDO"
-        elif has_anyrouter:
-            platform_name = "AnyRouter"
+        platforms = []
+        if has_anyrouter:
+            platforms.append("AnyRouter")
+        if has_wong:
+            platforms.append("WONG")
+        if has_linuxdo:
+            platforms.append("LinuxDO")
+        
+        if platforms:
+            platform_name = "+".join(platforms)
         else:
             platform_name = "签到"
         
@@ -690,6 +696,55 @@ class NotificationManager:
                 elif status == "failed":
                     msg = result.get('message', '未知错误')
                     lines.append(f"[失败] {account}: {msg}")
+                    html_parts.append(f'''
+        <div>
+            <div style="font-size: 13px; color: #86868B; margin-bottom: 6px;">{account}</div>
+            <div style="font-size: 15px; color: #FF3B30;">{msg}</div>
+        </div>''')
+            
+            html_parts.append('</div>')
+            lines.append("")
+        
+        # WONG 公益站余额卡片
+        if wong_results:
+            html_parts.append('''
+    <!-- WONG 公益站卡片 -->
+    <div style="background: #FFFFFF; border-radius: 18px; padding: 24px; margin-bottom: 16px; box-shadow: 0 2px 12px rgba(0,0,0,0.04);">
+        <div style="display: flex; align-items: center; margin-bottom: 20px;">
+            <span style="font-size: 24px; margin-right: 12px;">🎁</span>
+            <span style="font-size: 17px; font-weight: 600; color: #1D1D1F;">WONG 公益站</span>
+        </div>
+''')
+            
+            for i, result in enumerate(wong_results):
+                details = result.get("details", {})
+                account = result.get("account", "Unknown")
+                status = result.get("status", "unknown")
+                
+                if i > 0:
+                    html_parts.append('<div style="height: 1px; background: #F5F5F7; margin: 16px 0;"></div>')
+                
+                if status == "success" and details:
+                    balance = details.get("balance", "N/A")
+                    used = details.get("used", "N/A")
+                    lines.append(f"[WONG] {account}: {balance}, 已使用: {used}")
+                    html_parts.append(f'''
+        <div>
+            <div style="font-size: 13px; color: #86868B; margin-bottom: 6px;">{account}</div>
+            <div style="display: flex; justify-content: space-between; align-items: baseline;">
+                <div>
+                    <span style="font-size: 34px; font-weight: 600; color: #1D1D1F; letter-spacing: -1px;">{balance}</span>
+                    <span style="font-size: 13px; color: #86868B; margin-left: 4px;">余额</span>
+                </div>
+                <div style="text-align: right;">
+                    <span style="font-size: 17px; color: #FF9500;">{used}</span>
+                    <span style="font-size: 13px; color: #86868B; margin-left: 4px;">已用</span>
+                </div>
+            </div>
+        </div>''')
+                elif status == "failed":
+                    msg = result.get('message', '未知错误')
+                    lines.append(f"[WONG失败] {account}: {msg}")
                     html_parts.append(f'''
         <div>
             <div style="font-size: 13px; color: #86868B; margin-bottom: 6px;">{account}</div>

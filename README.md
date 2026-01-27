@@ -6,6 +6,7 @@
 
 - **LinuxDo** - 自动登录、浏览帖子、随机点赞
 - **AnyRouter** - 自动签到、查询余额
+- **WONG 公益站** - 自动签到、查询余额（wzw.pp.ua）
 
 ## 功能特性
 
@@ -52,18 +53,53 @@
 | `LINUXDO_PASSWORD` | 密码 |
 | `BROWSE_ENABLED` | 是否浏览帖子（默认 true）|
 
-### AnyRouter 配置
+### AnyRouter 类平台配置（ANYROUTER_ACCOUNTS）
+
+`ANYROUTER_ACCOUNTS` 环境变量支持多个平台，通过 `provider` 字段区分：
+
+| provider | 平台 | 说明 |
+|----------|------|------|
+| `anyrouter` | AnyRouter | anyrouter.top（默认值）|
+| `wong` | WONG 公益站 | wzw.pp.ua |
+
+#### 配置格式
 
 ```json
 [
   {
-    "cookies": {"session": "MTc2ODc4NzQzNHxEWDhFQVFMX2dBQUJFQUVRQUFE..."},
-    "api_user": "68121",
+    "name": "账号名称",
     "provider": "anyrouter",
-    "name": "账号1"
+    "cookies": {"session": "session_cookie_value"},
+    "api_user": "用户ID"
   }
 ]
 ```
+
+| 字段 | 说明 |
+|------|------|
+| `name` | 账号显示名称 |
+| `provider` | 平台类型：`anyrouter` 或 `wong` |
+| `cookies` | Cookie 对象，包含 `session` 字段 |
+| `api_user` | 用户 ID（请求头 `new-api-user` 的值）|
+
+#### 混合配置示例
+
+```json
+[
+  {"name": "AnyRouter主号", "provider": "anyrouter", "cookies": {"session": "MTc2ODc4..."}, "api_user": "59286"},
+  {"name": "AnyRouter小号", "provider": "anyrouter", "cookies": {"session": "MTc2Nzkz..."}, "api_user": "60723"},
+  {"name": "WONG账号", "provider": "wong", "cookies": {"session": "MTc2OTQ4..."}, "api_user": "12231"}
+]
+```
+
+#### 获取 Cookie 和 api_user
+
+1. 登录对应平台（anyrouter.top 或 wzw.pp.ua）
+2. 打开浏览器开发者工具 (F12)
+3. **Cookie**: Application
+```
+
+> ⚠️ **注意**: Cookie 会过期，过期后需要重新登录获取新的 session 值。
 
 ### 通知配置（可选）
 
@@ -124,6 +160,7 @@ sign-in/
 │   ├── base.py               # 基础类
 │   ├── linuxdo.py            # LinuxDo
 │   ├── anyrouter.py          # AnyRouter
+│   ├── wong.py               # WONG 公益站
 │   └── manager.py            # 平台管理
 ├── utils/                     # 工具模块
 │   ├── config.py             # 配置管理

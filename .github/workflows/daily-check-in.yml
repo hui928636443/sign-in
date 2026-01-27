@@ -62,6 +62,9 @@ jobs:
           ANYROUTER_ACCOUNTS: ${{ secrets.ANYROUTER_ACCOUNTS }}
           PROVIDERS: ${{ secrets.PROVIDERS }}
           
+          # WONG 公益站配置
+          WONG_ACCOUNTS: ${{ secrets.WONG_ACCOUNTS }}
+          
           # 通知配置 - Email
           EMAIL_USER: ${{ secrets.EMAIL_USER }}
           EMAIL_PASS: ${{ secrets.EMAIL_PASS }}

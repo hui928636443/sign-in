@@ -82,6 +82,41 @@ class AnyRouterAccount:
 
 
 @dataclass
+class WongAccount:
+    """WONG 公益站账号配置
+    
+    支持两种登录方式：
+    1. LinuxDO OAuth（优先）
+    2. Cookie 回退
+    """
+    
+    linuxdo_username: Optional[str] = None
+    linuxdo_password: Optional[str] = None
+    fallback_cookies: Optional[str] = None
+    api_user: Optional[str] = None
+    name: Optional[str] = None
+    
+    @classmethod
+    def from_dict(cls, data: dict, index: int) -> "WongAccount":
+        """从字典创建 WongAccount"""
+        name = data.get("name") or f"WONG Account {index + 1}"
+        return cls(
+            linuxdo_username=data.get("linuxdo_username"),
+            linuxdo_password=data.get("linuxdo_password"),
+            fallback_cookies=data.get("fallback_cookies") or data.get("cookies"),
+            api_user=data.get("api_user"),
+            name=name,
+        )
+    
+    def get_display_name(self, index: int) -> str:
+        if self.name:
+            return self.name
+        if self.linuxdo_username:
+            return self.linuxdo_username
+        return f"WONG Account {index + 1}"
+
+
+@dataclass
 class ProviderConfig:
     """Provider 配置"""
 
@@ -133,7 +168,11 @@ class ProviderConfig:
         return self.bypass_method == "waf_cookies"
 
     def needs_manual_check_in(self) -> bool:
-        return self.bypass_method == "waf_cookies"
+        """判断是否需要手动调用签到 API
+        
+        如果配置了 sign_in_path，则需要手动签到
+        """
+        return self.sign_in_path is not None
 
 
 @dataclass
@@ -142,6 +181,7 @@ class AppConfig:
 
     linuxdo_accounts: List[LinuxDoAccount] = field(default_factory=list)
     anyrouter_accounts: List[AnyRouterAccount] = field(default_factory=list)
+    wong_accounts: List[WongAccount] = field(default_factory=list)
     providers: Dict[str, ProviderConfig] = field(default_factory=dict)
 
     # 向后兼容属性
@@ -154,9 +194,15 @@ class AppConfig:
     def load_from_env(cls) -> "AppConfig":
         """从环境变量加载完整配置"""
         linuxdo_accounts = cls._load_linuxdo_accounts()
+        wong_accounts = cls._load_wong_accounts(linuxdo_accounts)
         anyrouter_accounts = cls._load_anyrouter_accounts()
         providers = cls._load_providers()
-        return cls(linuxdo_accounts=linuxdo_accounts, anyrouter_accounts=anyrouter_accounts, providers=providers)
+        return cls(
+            linuxdo_accounts=linuxdo_accounts,
+            anyrouter_accounts=anyrouter_accounts,
+            wong_accounts=wong_accounts,
+            providers=providers,
+        )
     
     @classmethod
     def _load_linuxdo_accounts(cls) -> List[LinuxDoAccount]:
@@ -216,6 +262,56 @@ class AppConfig:
         return accounts
     
     @classmethod
+    def _load_wong_accounts(cls, linuxdo_accounts: List[LinuxDoAccount]) -> List[WongAccount]:
+        """从环境变量加载 WONG 公益站账号配置
+        
+        支持两种配置方式：
+        1. WONG_ACCOUNTS 环境变量（JSON 数组）
+        2. 自动使用 LinuxDO 账号（如果配置了 WONG_ENABLED=true）
+        
+        Args:
+            linuxdo_accounts: LinuxDO 账号列表（用于自动关联）
+        """
+        accounts = []
+        
+        # 方式1: 从 WONG_ACCOUNTS 环境变量加载
+        accounts_str = os.getenv("WONG_ACCOUNTS")
+        if accounts_str:
+            try:
+                accounts_data = json.loads(accounts_str)
+                
+                if not isinstance(accounts_data, list):
+                    logger.error("WONG_ACCOUNTS 配置格式错误: 必须是 JSON 数组格式")
+                else:
+                    for i, account_dict in enumerate(accounts_data):
+                        if not isinstance(account_dict, dict):
+                            logger.error(f"WONG 账号 {i + 1} 配置格式错误: 必须是 JSON 对象")
+                            continue
+                        
+                        accounts.append(WongAccount.from_dict(account_dict, i))
+                    
+                    if accounts:
+                        logger.info(f"成功加载 {len(accounts)} 个 WONG 账号配置 (JSON 格式)")
+                        return accounts
+            except json.JSONDecodeError as e:
+                logger.error(f"WONG_ACCOUNTS JSON 解析失败: {e}")
+            except Exception as e:
+                logger.error(f"加载 WONG_ACCOUNTS 时发生错误: {e}")
+        
+        # 方式2: 自动使用 LinuxDO 账号
+        wong_enabled = os.getenv("WONG_ENABLED", "").lower() in ["true", "1", "yes", "on"]
+        if wong_enabled and linuxdo_accounts:
+            for i, linuxdo_acc in enumerate(linuxdo_accounts):
+                accounts.append(WongAccount(
+                    linuxdo_username=linuxdo_acc.username,
+                    linuxdo_password=linuxdo_acc.password,
+                    name=f"WONG ({linuxdo_acc.get_display_name(i)})",
+                ))
+            logger.info(f"自动关联 {len(accounts)} 个 LinuxDO 账号到 WONG 公益站")
+        
+        return accounts
+    
+    @classmethod
     def _load_anyrouter_accounts(cls) -> List[AnyRouterAccount]:
         """从环境变量加载 AnyRouter 账号配置"""
         accounts_str = os.getenv("ANYROUTER_ACCOUNTS")
@@ -268,6 +364,15 @@ class AppConfig:
                 sign_in_path=None,
                 bypass_method="waf_cookies",
                 waf_cookie_names=["acw_tc"],
+            ),
+            "wong": ProviderConfig(
+                name="wong",
+                domain="https://wzw.pp.ua",
+                sign_in_path="/api/user/checkin",
+                user_info_path="/api/user/self",
+                api_user_key="new-api-user",
+                bypass_method=None,  # 不需要 WAF bypass
+                waf_cookie_names=None,
             ),
         }
         

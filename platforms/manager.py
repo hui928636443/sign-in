@@ -18,6 +18,7 @@ from loguru import logger
 from platforms.anyrouter import AnyRouterAdapter
 from platforms.base import CheckinResult, CheckinStatus
 from platforms.linuxdo import LinuxDoAdapter
+from platforms.wong import WongAdapter
 from utils.config import AppConfig
 from utils.notify import NotificationManager
 
@@ -50,6 +51,10 @@ class PlatformManager:
         linuxdo_results = await self._run_all_linuxdo()
         self.results.extend(linuxdo_results)
         
+        # WONG 公益站
+        wong_results = await self._run_all_wong()
+        self.results.extend(wong_results)
+        
         # AnyRouter
         anyrouter_results = await self._run_all_anyrouter()
         self.results.extend(anyrouter_results)
@@ -60,7 +65,7 @@ class PlatformManager:
         """运行指定平台签到
         
         Args:
-            platform: 平台名称 ("linuxdo" 或 "anyrouter")
+            platform: 平台名称 ("linuxdo", "wong" 或 "anyrouter")
         
         Returns:
             list[CheckinResult]: 签到结果
@@ -75,6 +80,9 @@ class PlatformManager:
         if platform_lower == "linuxdo":
             linuxdo_results = await self._run_all_linuxdo()
             self.results.extend(linuxdo_results)
+        elif platform_lower == "wong":
+            wong_results = await self._run_all_wong()
+            self.results.extend(wong_results)
         elif platform_lower == "anyrouter":
             anyrouter_results = await self._run_all_anyrouter()
             self.results.extend(anyrouter_results)
@@ -139,11 +147,69 @@ class PlatformManager:
             message="未配置 LinuxDo 账号",
         )
     
+    async def _run_all_wong(self) -> list[CheckinResult]:
+        """运行所有 WONG 公益站账号签到"""
+        if not self.config.wong_accounts:
+            logger.info("WONG 公益站未配置")
+            return []
+        
+        results = []
+        for i, account in enumerate(self.config.wong_accounts):
+            logger.info(f"开始执行 WONG 账号 {i + 1}: {account.get_display_name(i)}")
+            
+            adapter = WongAdapter(
+                linuxdo_username=account.linuxdo_username,
+                linuxdo_password=account.linuxdo_password,
+                fallback_cookies=account.fallback_cookies,
+                api_user=account.api_user,
+                account_name=account.get_display_name(i),
+            )
+            
+            try:
+                result = await adapter.run()
+                results.append(result)
+            except Exception as e:
+                logger.error(f"WONG 账号 {i + 1} 执行异常: {e}")
+                results.append(CheckinResult(
+                    platform="WONG公益站",
+                    account=account.get_display_name(i),
+                    status=CheckinStatus.FAILED,
+                    message=f"执行异常: {str(e)}",
+                ))
+        
+        return results
+    
     async def _run_all_anyrouter(self) -> list[CheckinResult]:
-        """运行所有 AnyRouter 账号签到"""
+        """运行所有 AnyRouter 账号签到（包括 provider=wong 的账号）"""
         results = []
         
         for i, account in enumerate(self.config.anyrouter_accounts):
+            # 特殊处理 provider=wong 的账号，使用 WongAdapter
+            if account.provider == "wong":
+                logger.info(f"检测到 WONG 账号 (provider=wong): {account.get_display_name(i)}")
+                
+                # 从 cookies 中提取 session
+                session_cookie = self._extract_session_cookie(account.cookies)
+                
+                adapter = WongAdapter(
+                    fallback_cookies=session_cookie,
+                    api_user=account.api_user,
+                    account_name=account.get_display_name(i),
+                )
+                
+                try:
+                    result = await adapter.run()
+                    results.append(result)
+                except Exception as e:
+                    logger.error(f"WONG 账号 {account.get_display_name(i)} 执行异常: {e}")
+                    results.append(CheckinResult(
+                        platform="WONG公益站",
+                        account=account.get_display_name(i),
+                        status=CheckinStatus.FAILED,
+                        message=f"执行异常: {str(e)}",
+                    ))
+                continue
+            
             provider = self.config.providers.get(account.provider)
             if not provider:
                 logger.warning(f"Provider '{account.provider}' 未找到，跳过账号 {i + 1}")
@@ -165,6 +231,14 @@ class PlatformManager:
             results.append(result)
         
         return results
+    
+    def _extract_session_cookie(self, cookies) -> str:
+        """从 cookies 中提取 session 值"""
+        if isinstance(cookies, dict):
+            return cookies.get("session", "")
+        if isinstance(cookies, str):
+            return cookies
+        return ""
     
     def send_summary_notification(self, force: bool = False) -> None:
         """发送签到汇总通知
