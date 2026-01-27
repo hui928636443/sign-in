@@ -51,11 +51,11 @@ class PlatformManager:
         linuxdo_results = await self._run_all_linuxdo()
         self.results.extend(linuxdo_results)
         
-        # WONG 公益站
-        wong_results = await self._run_all_wong()
+        # WONG 公益站 (仅 WONG_ACCOUNTS 配置的)
+        wong_results = await self._run_wong_accounts_only()
         self.results.extend(wong_results)
         
-        # AnyRouter
+        # AnyRouter 类平台（包括 provider=wong 和 provider=anyrouter）
         anyrouter_results = await self._run_all_anyrouter()
         self.results.extend(anyrouter_results)
         
@@ -147,16 +147,12 @@ class PlatformManager:
             message="未配置 LinuxDo 账号",
         )
     
-    async def _run_all_wong(self) -> list[CheckinResult]:
-        """运行所有 WONG 公益站账号签到
+    async def _run_wong_accounts_only(self) -> list[CheckinResult]:
+        """运行 WONG_ACCOUNTS 环境变量配置的账号（不包括 ANYROUTER_ACCOUNTS 里的）"""
+        if not self.config.wong_accounts:
+            return []
         
-        包括：
-        1. WONG_ACCOUNTS 环境变量配置的账号
-        2. ANYROUTER_ACCOUNTS 中 provider=wong 的账号
-        """
         results = []
-        
-        # 1. 处理 WONG_ACCOUNTS 配置的账号
         for i, account in enumerate(self.config.wong_accounts):
             logger.info(f"开始执行 WONG 账号 {i + 1}: {account.get_display_name(i)}")
             
@@ -179,6 +175,21 @@ class PlatformManager:
                     status=CheckinStatus.FAILED,
                     message=f"执行异常: {str(e)}",
                 ))
+        
+        return results
+    
+    async def _run_all_wong(self) -> list[CheckinResult]:
+        """运行所有 WONG 公益站账号签到（用于 --platform wong）
+        
+        包括：
+        1. WONG_ACCOUNTS 环境变量配置的账号
+        2. ANYROUTER_ACCOUNTS 中 provider=wong 的账号
+        """
+        results = []
+        
+        # 1. 处理 WONG_ACCOUNTS 配置的账号
+        wong_accounts_results = await self._run_wong_accounts_only()
+        results.extend(wong_accounts_results)
         
         # 2. 处理 ANYROUTER_ACCOUNTS 中 provider=wong 的账号
         wong_from_anyrouter = [acc for acc in self.config.anyrouter_accounts if acc.provider == "wong"]
@@ -211,33 +222,54 @@ class PlatformManager:
         return results
     
     async def _run_all_anyrouter(self) -> list[CheckinResult]:
-        """运行所有 AnyRouter 账号签到（跳过 provider=wong，由 _run_all_wong 处理）"""
+        """运行所有 ANYROUTER_ACCOUNTS 账号签到，根据 provider 自动选择适配器"""
         results = []
         
         for i, account in enumerate(self.config.anyrouter_accounts):
-            # 跳过 provider=wong 的账号，这些由 _run_all_wong 处理
+            # 根据 provider 选择适配器
             if account.provider == "wong":
-                continue
-            
-            provider = self.config.providers.get(account.provider)
-            if not provider:
-                logger.warning(f"Provider '{account.provider}' 未找到，跳过账号 {i + 1}")
-                results.append(CheckinResult(
-                    platform=f"AnyRouter ({account.provider})",
-                    account=account.get_display_name(i),
-                    status=CheckinStatus.SKIPPED,
-                    message=f"Provider '{account.provider}' 未配置",
-                ))
-                continue
-            
-            adapter = AnyRouterAdapter(
-                account=account,
-                provider_config=provider,
-                account_index=i,
-            )
-            
-            result = await adapter.run()
-            results.append(result)
+                # 使用 WongAdapter
+                logger.info(f"开始执行 WONG 账号: {account.get_display_name(i)}")
+                session_cookie = self._extract_session_cookie(account.cookies)
+                
+                adapter = WongAdapter(
+                    fallback_cookies=session_cookie,
+                    api_user=account.api_user,
+                    account_name=account.get_display_name(i),
+                )
+                
+                try:
+                    result = await adapter.run()
+                    results.append(result)
+                except Exception as e:
+                    logger.error(f"WONG 账号 {account.get_display_name(i)} 执行异常: {e}")
+                    results.append(CheckinResult(
+                        platform="WONG公益站",
+                        account=account.get_display_name(i),
+                        status=CheckinStatus.FAILED,
+                        message=f"执行异常: {str(e)}",
+                    ))
+            else:
+                # 使用 AnyRouterAdapter
+                provider = self.config.providers.get(account.provider)
+                if not provider:
+                    logger.warning(f"Provider '{account.provider}' 未找到，跳过账号 {i + 1}")
+                    results.append(CheckinResult(
+                        platform=f"AnyRouter ({account.provider})",
+                        account=account.get_display_name(i),
+                        status=CheckinStatus.SKIPPED,
+                        message=f"Provider '{account.provider}' 未配置",
+                    ))
+                    continue
+                
+                adapter = AnyRouterAdapter(
+                    account=account,
+                    provider_config=provider,
+                    account_index=i,
+                )
+                
+                result = await adapter.run()
+                results.append(result)
         
         return results
     
