@@ -448,19 +448,43 @@ class LinuxDoAdapter(BasePlatformAdapter):
             logger.info(f"等待 {wait_time:.2f} 秒...")
             await asyncio.sleep(wait_time)
     
+    async def _dismiss_dialog(self, page: Page) -> None:
+        """关闭页面上可能存在的弹窗"""
+        try:
+            # 检查是否有 dialog 弹窗
+            dialog_holder = await page.query_selector("#dialog-holder.dialog-container")
+            if dialog_holder:
+                # 尝试点击关闭按钮
+                close_btn = await page.query_selector(".dialog-close, [data-a11y-dialog-hide]")
+                if close_btn:
+                    await close_btn.click(timeout=2000)
+                    logger.info("已关闭弹窗")
+                    await asyncio.sleep(0.5)
+                else:
+                    # 按 Escape 键关闭
+                    await page.keyboard.press("Escape")
+                    logger.info("按 Escape 关闭弹窗")
+                    await asyncio.sleep(0.5)
+        except Exception:
+            pass  # 没有弹窗或关闭失败，继续执行
+
     async def _click_like(self, page: Page) -> None:
         """点赞帖子"""
         try:
+            # 先关闭可能存在的弹窗
+            await self._dismiss_dialog(page)
+            
             like_button = await page.query_selector(".discourse-reactions-reaction-button")
             if like_button:
                 logger.info("找到未点赞的帖子，准备点赞")
-                await like_button.click()
+                # 使用 force=True 强制点击，跳过可操作性检查
+                await like_button.click(timeout=5000, force=True)
                 logger.info("点赞成功")
                 await asyncio.sleep(random.uniform(1, 2))
             else:
                 logger.info("帖子可能已经点过赞了")
         except Exception as e:
-            logger.error(f"点赞失败: {e}")
+            logger.warning(f"点赞失败（不影响签到）: {e}")
     
     # 需要屏蔽的分类
     BLOCKED_CATEGORIES = {"公告", "运营反馈"}
