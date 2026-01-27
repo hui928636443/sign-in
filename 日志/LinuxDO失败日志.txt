@@ -1,0 +1,345 @@
+warning: The `tool.uv.dev-dependencies` field (used in `pyproject.toml`) is deprecated and will be removed in a future release; use `dependency-groups.dev` instead
+***32m2026-01-27 02:38:55***0m | ***1mINFO    ***0m | ***36mutils.config***0m:***36m_load_linuxdo_accounts***0m:***36m192***0m - ***1m成功加载 2 个 LinuxDo 账号配置 (JSON 格式)***0m
+***32m2026-01-27 02:38:55***0m | ***1mINFO    ***0m | ***36mutils.config***0m:***36m_load_anyrouter_accounts***0m:***36m245***0m - ***1m成功加载 2 个 AnyRouter 账号配置***0m
+***32m2026-01-27 02:38:55***0m | ***1mINFO    ***0m | ***36m__main__***0m:***36mrun_checkin***0m:***36m152***0m - ***1m开始签到 - 2026-01-27 02:38:55***0m
+***32m2026-01-27 02:38:55***0m | ***1mINFO    ***0m | ***36mplatforms.base***0m:***36mrun***0m:***36m126***0m - ***1m***LinuxDo*** 开始签到: 主账号***0m
+***32m2026-01-27 02:38:55***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36mlogin***0m:***36m116***0m - ***1m开始登录 LinuxDo***0m
+***32m2026-01-27 02:38:56***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36mlogin***0m:***36m122***0m - ***1m获取 CSRF token...***0m
+***32m2026-01-27 02:38:56***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36mlogin***0m:***36m138***0m - ***1mCSRF Token 获取成功: 8W_tMyZOLr...***0m
+***32m2026-01-27 02:38:56***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36mlogin***0m:***36m144***0m - ***1m正在登录...***0m
+***32m2026-01-27 02:38:57***0m | ***31m***1mERROR   ***0m | ***36mplatforms.linuxdo***0m:***36mlogin***0m:***36m166***0m - ***31m***1m登录失败: 用户名、电子邮件地址或密码不正确***0m
+***32m2026-01-27 02:38:57***0m | ***31m***1mERROR   ***0m | ***36mplatforms.base***0m:***36mrun***0m:***36m130***0m - ***31m***1m***LinuxDo*** 登录失败: 主账号***0m
+***32m2026-01-27 02:38:57***0m | ***1mINFO    ***0m | ***36mplatforms.base***0m:***36mrun***0m:***36m126***0m - ***1m***LinuxDo*** 开始签到: 小号***0m
+***32m2026-01-27 02:38:57***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36mlogin***0m:***36m116***0m - ***1m开始登录 LinuxDo***0m
+***32m2026-01-27 02:38:57***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36mlogin***0m:***36m122***0m - ***1m获取 CSRF token...***0m
+***32m2026-01-27 02:38:57***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36mlogin***0m:***36m138***0m - ***1mCSRF Token 获取成功: jilpwCpB87...***0m
+***32m2026-01-27 02:38:57***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36mlogin***0m:***36m144***0m - ***1m正在登录...***0m
+***32m2026-01-27 02:38:58***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36mlogin***0m:***36m168***0m - ***1m登录成功!***0m
+***32m2026-01-27 02:38:58***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_fetch_connect_info***0m:***36m310***0m - ***1m获取 Connect 信息***0m
+***32m2026-01-27 02:38:58***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36mlogin***0m:***36m180***0m - ***1m同步 Cookie 到 Patchright...***0m
+***32m2026-01-27 02:38:58***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36mlogin***0m:***36m195***0m - ***1mCookie 设置完成，导航至 linux.do...***0m
+***32m2026-01-27 02:39:05***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36mlogin***0m:***36m211***0m - ***1m登录验证成功***0m
+***32m2026-01-27 02:39:05***0m | ***1mINFO    ***0m | ***36mplatforms.base***0m:***36mrun***0m:***36m138***0m - ***1m***LinuxDo*** 登录成功: 小号***0m
+***32m2026-01-27 02:39:05***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_collect_hot_topics***0m:***36m470***0m - ***1m收集热门话题...***0m
+***32m2026-01-27 02:39:06***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_collect_hot_topics***0m:***36m524***0m - ***1m收集到 10 个热门话题***0m
+***32m2026-01-27 02:39:06***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_click_topics***0m:***36m391***0m - ***1m发现 28 个可浏览帖子，随机选择浏览***0m
+***32m2026-01-27 02:39:08***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m428***0m - ***1m向下滚动 601 像素...***0m
+***32m2026-01-27 02:39:09***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m430***0m - ***1m已加载页面: https://linux.do/t/topic/1519077***0m
+***32m2026-01-27 02:39:09***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m448***0m - ***1m等待 3.14 秒...***0m
+***32m2026-01-27 02:39:12***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m428***0m - ***1m向下滚动 621 像素...***0m
+***32m2026-01-27 02:39:12***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m430***0m - ***1m已加载页面: https://linux.do/t/topic/1519077/3***0m
+***32m2026-01-27 02:39:12***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m448***0m - ***1m等待 2.24 秒...***0m
+***32m2026-01-27 02:39:15***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m428***0m - ***1m向下滚动 579 像素...***0m
+***32m2026-01-27 02:39:15***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m430***0m - ***1m已加载页面: https://linux.do/t/topic/1519077/3***0m
+***32m2026-01-27 02:39:15***0m | ***32m***1mSUCCESS ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m444***0m - ***32m***1m已到达页面底部，退出浏览***0m
+***32m2026-01-27 02:39:16***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m428***0m - ***1m向下滚动 629 像素...***0m
+***32m2026-01-27 02:39:17***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m430***0m - ***1m已加载页面: https://linux.do/t/topic/1519299***0m
+***32m2026-01-27 02:39:17***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m448***0m - ***1m等待 3.84 秒...***0m
+***32m2026-01-27 02:39:21***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m428***0m - ***1m向下滚动 641 像素...***0m
+***32m2026-01-27 02:39:21***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m430***0m - ***1m已加载页面: https://linux.do/t/topic/1519299/5***0m
+***32m2026-01-27 02:39:21***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m448***0m - ***1m等待 3.39 秒...***0m
+***32m2026-01-27 02:39:24***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m428***0m - ***1m向下滚动 572 像素...***0m
+***32m2026-01-27 02:39:24***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m430***0m - ***1m已加载页面: https://linux.do/t/topic/1519299/5***0m
+***32m2026-01-27 02:39:24***0m | ***32m***1mSUCCESS ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m444***0m - ***32m***1m已到达页面底部，退出浏览***0m
+***32m2026-01-27 02:39:26***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m428***0m - ***1m向下滚动 605 像素...***0m
+***32m2026-01-27 02:39:28***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m430***0m - ***1m已加载页面: https://linux.do/t/topic/1410275***0m
+***32m2026-01-27 02:39:28***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m448***0m - ***1m等待 3.42 秒...***0m
+***32m2026-01-27 02:39:31***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m428***0m - ***1m向下滚动 632 像素...***0m
+***32m2026-01-27 02:39:31***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m430***0m - ***1m已加载页面: https://linux.do/t/topic/1410275***0m
+***32m2026-01-27 02:39:31***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m448***0m - ***1m等待 3.73 秒...***0m
+***32m2026-01-27 02:39:35***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m428***0m - ***1m向下滚动 639 像素...***0m
+***32m2026-01-27 02:39:35***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m430***0m - ***1m已加载页面: https://linux.do/t/topic/1410275/4***0m
+***32m2026-01-27 02:39:35***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m448***0m - ***1m等待 2.34 秒...***0m
+***32m2026-01-27 02:39:37***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m428***0m - ***1m向下滚动 613 像素...***0m
+***32m2026-01-27 02:39:38***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m430***0m - ***1m已加载页面: https://linux.do/t/topic/1410275/5***0m
+***32m2026-01-27 02:39:38***0m | ***32m***1mSUCCESS ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m433***0m - ***32m***1m随机退出浏览***0m
+***32m2026-01-27 02:39:39***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m428***0m - ***1m向下滚动 570 像素...***0m
+***32m2026-01-27 02:39:41***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m430***0m - ***1m已加载页面: https://linux.do/t/topic/1518846***0m
+***32m2026-01-27 02:39:41***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m448***0m - ***1m等待 2.25 秒...***0m
+***32m2026-01-27 02:39:43***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m428***0m - ***1m向下滚动 614 像素...***0m
+***32m2026-01-27 02:39:43***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m430***0m - ***1m已加载页面: https://linux.do/t/topic/1518846***0m
+***32m2026-01-27 02:39:43***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m448***0m - ***1m等待 3.74 秒...***0m
+***32m2026-01-27 02:39:47***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m428***0m - ***1m向下滚动 603 像素...***0m
+***32m2026-01-27 02:39:47***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m430***0m - ***1m已加载页面: https://linux.do/t/topic/1518846***0m
+***32m2026-01-27 02:39:47***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m448***0m - ***1m等待 2.10 秒...***0m
+***32m2026-01-27 02:39:49***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m428***0m - ***1m向下滚动 636 像素...***0m
+***32m2026-01-27 02:39:49***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m430***0m - ***1m已加载页面: https://linux.do/t/topic/1518846***0m
+***32m2026-01-27 02:39:49***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m448***0m - ***1m等待 3.54 秒...***0m
+***32m2026-01-27 02:39:52***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m428***0m - ***1m向下滚动 628 像素...***0m
+***32m2026-01-27 02:39:52***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m430***0m - ***1m已加载页面: https://linux.do/t/topic/1518846/2***0m
+***32m2026-01-27 02:39:52***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m448***0m - ***1m等待 3.79 秒...***0m
+***32m2026-01-27 02:39:56***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m428***0m - ***1m向下滚动 645 像素...***0m
+***32m2026-01-27 02:39:56***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m430***0m - ***1m已加载页面: https://linux.do/t/topic/1518846/6***0m
+***32m2026-01-27 02:39:56***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m448***0m - ***1m等待 3.52 秒...***0m
+***32m2026-01-27 02:40:00***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m428***0m - ***1m向下滚动 602 像素...***0m
+***32m2026-01-27 02:40:00***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m430***0m - ***1m已加载页面: https://linux.do/t/topic/1518846/9***0m
+***32m2026-01-27 02:40:00***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m448***0m - ***1m等待 3.97 秒...***0m
+***32m2026-01-27 02:40:04***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m428***0m - ***1m向下滚动 647 像素...***0m
+***32m2026-01-27 02:40:04***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m430***0m - ***1m已加载页面: https://linux.do/t/topic/1518846/10***0m
+***32m2026-01-27 02:40:04***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m448***0m - ***1m等待 2.81 秒...***0m
+***32m2026-01-27 02:40:07***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m428***0m - ***1m向下滚动 569 像素...***0m
+***32m2026-01-27 02:40:07***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m430***0m - ***1m已加载页面: https://linux.do/t/topic/1518846/11***0m
+***32m2026-01-27 02:40:07***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m448***0m - ***1m等待 2.56 秒...***0m
+***32m2026-01-27 02:40:09***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m428***0m - ***1m向下滚动 629 像素...***0m
+***32m2026-01-27 02:40:09***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m430***0m - ***1m已加载页面: https://linux.do/t/topic/1518846/11***0m
+***32m2026-01-27 02:40:09***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m448***0m - ***1m等待 2.58 秒...***0m
+***32m2026-01-27 02:40:12***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m428***0m - ***1m向下滚动 569 像素...***0m
+***32m2026-01-27 02:40:12***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m430***0m - ***1m已加载页面: https://linux.do/t/topic/1518988/1?__cf_chl_rt_tk=5MT02hd1VqXL7KXOwCeuRsKZlxexmZS4uSqy4d0cyj4-1769481612-1.0.1.1-8n7RuGJeExHonQ8sFn5YNM9Ajhl_MyCc_S.LMBctAmQ***0m
+***32m2026-01-27 02:40:12***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m448***0m - ***1m等待 2.64 秒...***0m
+***32m2026-01-27 02:40:15***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m428***0m - ***1m向下滚动 555 像素...***0m
+***32m2026-01-27 02:40:15***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m430***0m - ***1m已加载页面: https://linux.do/t/topic/1518988/1***0m
+***32m2026-01-27 02:40:15***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m448***0m - ***1m等待 2.11 秒...***0m
+***32m2026-01-27 02:40:17***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m428***0m - ***1m向下滚动 647 像素...***0m
+***32m2026-01-27 02:40:17***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m430***0m - ***1m已加载页面: https://linux.do/t/topic/1518988/1***0m
+***32m2026-01-27 02:40:17***0m | ***32m***1mSUCCESS ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m444***0m - ***32m***1m已到达页面底部，退出浏览***0m
+***32m2026-01-27 02:40:18***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m428***0m - ***1m向下滚动 642 像素...***0m
+***32m2026-01-27 02:40:19***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m430***0m - ***1m已加载页面: https://linux.do/t/topic/1508439***0m
+***32m2026-01-27 02:40:19***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m448***0m - ***1m等待 2.46 秒...***0m
+***32m2026-01-27 02:40:22***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m428***0m - ***1m向下滚动 573 像素...***0m
+***32m2026-01-27 02:40:22***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m430***0m - ***1m已加载页面: https://linux.do/t/topic/1508439***0m
+***32m2026-01-27 02:40:22***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m448***0m - ***1m等待 3.33 秒...***0m
+***32m2026-01-27 02:40:25***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m428***0m - ***1m向下滚动 550 像素...***0m
+***32m2026-01-27 02:40:25***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m430***0m - ***1m已加载页面: https://linux.do/t/topic/1508439***0m
+***32m2026-01-27 02:40:25***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m448***0m - ***1m等待 2.84 秒...***0m
+***32m2026-01-27 02:40:28***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m428***0m - ***1m向下滚动 594 像素...***0m
+***32m2026-01-27 02:40:28***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m430***0m - ***1m已加载页面: https://linux.do/t/topic/1508439***0m
+***32m2026-01-27 02:40:28***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m448***0m - ***1m等待 3.31 秒...***0m
+***32m2026-01-27 02:40:31***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m428***0m - ***1m向下滚动 630 像素...***0m
+***32m2026-01-27 02:40:31***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m430***0m - ***1m已加载页面: https://linux.do/t/topic/1508439***0m
+***32m2026-01-27 02:40:31***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m448***0m - ***1m等待 3.31 秒...***0m
+***32m2026-01-27 02:40:35***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m428***0m - ***1m向下滚动 636 像素...***0m
+***32m2026-01-27 02:40:35***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m430***0m - ***1m已加载页面: https://linux.do/t/topic/1508439***0m
+***32m2026-01-27 02:40:35***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m448***0m - ***1m等待 3.46 秒...***0m
+***32m2026-01-27 02:40:38***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m428***0m - ***1m向下滚动 617 像素...***0m
+***32m2026-01-27 02:40:38***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m430***0m - ***1m已加载页面: https://linux.do/t/topic/1508439/5***0m
+***32m2026-01-27 02:40:38***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m448***0m - ***1m等待 2.51 秒...***0m
+***32m2026-01-27 02:40:41***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m428***0m - ***1m向下滚动 580 像素...***0m
+***32m2026-01-27 02:40:41***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m430***0m - ***1m已加载页面: https://linux.do/t/topic/1508439/8***0m
+***32m2026-01-27 02:40:41***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m448***0m - ***1m等待 3.84 秒...***0m
+***32m2026-01-27 02:40:45***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m428***0m - ***1m向下滚动 584 像素...***0m
+***32m2026-01-27 02:40:45***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m430***0m - ***1m已加载页面: https://linux.do/t/topic/1508439/10***0m
+***32m2026-01-27 02:40:45***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m448***0m - ***1m等待 3.74 秒...***0m
+***32m2026-01-27 02:40:48***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m428***0m - ***1m向下滚动 627 像素...***0m
+***32m2026-01-27 02:40:48***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m430***0m - ***1m已加载页面: https://linux.do/t/topic/1508439/12***0m
+***32m2026-01-27 02:40:48***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m448***0m - ***1m等待 3.20 秒...***0m
+***32m2026-01-27 02:40:52***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_click_like***0m:***36m461***0m - ***1m帖子可能已经点过赞了***0m
+***32m2026-01-27 02:40:52***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m428***0m - ***1m向下滚动 628 像素...***0m
+***32m2026-01-27 02:40:52***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m430***0m - ***1m已加载页面: https://linux.do/t/topic/1519102/1***0m
+***32m2026-01-27 02:40:52***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m448***0m - ***1m等待 3.19 秒...***0m
+***32m2026-01-27 02:40:55***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m428***0m - ***1m向下滚动 642 像素...***0m
+***32m2026-01-27 02:40:55***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m430***0m - ***1m已加载页面: https://linux.do/t/topic/1519102/1***0m
+***32m2026-01-27 02:40:55***0m | ***32m***1mSUCCESS ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m444***0m - ***32m***1m已到达页面底部，退出浏览***0m
+***32m2026-01-27 02:40:55***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m428***0m - ***1m向下滚动 586 像素...***0m
+***32m2026-01-27 02:40:55***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m430***0m - ***1m已加载页面: https://linux.do/t/topic/1518841/1?__cf_chl_rt_tk=7rtHpCTPNJ6n9gdqH4k31ACIgx8BEdO602LhfU6JWVE-1769481655-1.0.1.1-euyNj2h.47CtZd5Iyv9anKAy3bGZbeZEFL.EPx8IUSw***0m
+***32m2026-01-27 02:40:55***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m448***0m - ***1m等待 3.09 秒...***0m
+***32m2026-01-27 02:40:58***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m428***0m - ***1m向下滚动 555 像素...***0m
+***32m2026-01-27 02:40:58***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m430***0m - ***1m已加载页面: https://linux.do/t/topic/1518841/1***0m
+***32m2026-01-27 02:40:58***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m448***0m - ***1m等待 2.62 秒...***0m
+***32m2026-01-27 02:41:01***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m428***0m - ***1m向下滚动 563 像素...***0m
+***32m2026-01-27 02:41:01***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m430***0m - ***1m已加载页面: https://linux.do/t/topic/1518841/1***0m
+***32m2026-01-27 02:41:01***0m | ***32m***1mSUCCESS ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m444***0m - ***32m***1m已到达页面底部，退出浏览***0m
+***32m2026-01-27 02:41:01***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_click_like***0m:***36m461***0m - ***1m帖子可能已经点过赞了***0m
+***32m2026-01-27 02:41:01***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m428***0m - ***1m向下滚动 626 像素...***0m
+***32m2026-01-27 02:41:01***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m430***0m - ***1m已加载页面: https://linux.do/t/topic/1519244/1***0m
+***32m2026-01-27 02:41:01***0m | ***32m***1mSUCCESS ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m433***0m - ***32m***1m随机退出浏览***0m
+***32m2026-01-27 02:41:01***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m428***0m - ***1m向下滚动 572 像素...***0m
+***32m2026-01-27 02:41:01***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m430***0m - ***1m已加载页面: https://linux.do/t/topic/1515838/1?__cf_chl_rt_tk=5A.9aX.PtIIKBXyBq3ReQWUBauTRIdBnlur_Zx9pLnc-1769481661-1.0.1.1-h_t680S.xH5lBVP.zg6lHHo28dqS5Y13yIOoJ9QBPh8***0m
+***32m2026-01-27 02:41:01***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m448***0m - ***1m等待 3.87 秒...***0m
+***32m2026-01-27 02:41:05***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m428***0m - ***1m向下滚动 565 像素...***0m
+***32m2026-01-27 02:41:05***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m430***0m - ***1m已加载页面: https://linux.do/t/topic/1515838/1***0m
+***32m2026-01-27 02:41:05***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m448***0m - ***1m等待 2.37 秒...***0m
+***32m2026-01-27 02:41:07***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m428***0m - ***1m向下滚动 600 像素...***0m
+***32m2026-01-27 02:41:07***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m430***0m - ***1m已加载页面: https://linux.do/t/topic/1515838/1***0m
+***32m2026-01-27 02:41:07***0m | ***32m***1mSUCCESS ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m444***0m - ***32m***1m已到达页面底部，退出浏览***0m
+***32m2026-01-27 02:41:09***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m428***0m - ***1m向下滚动 622 像素...***0m
+***32m2026-01-27 02:41:10***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m430***0m - ***1m已加载页面: https://linux.do/t/topic/1483685***0m
+***32m2026-01-27 02:41:10***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m448***0m - ***1m等待 2.18 秒...***0m
+***32m2026-01-27 02:41:12***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m428***0m - ***1m向下滚动 553 像素...***0m
+***32m2026-01-27 02:41:12***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m430***0m - ***1m已加载页面: https://linux.do/t/topic/1483685/2***0m
+***32m2026-01-27 02:41:12***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m448***0m - ***1m等待 3.46 秒...***0m
+***32m2026-01-27 02:41:16***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m428***0m - ***1m向下滚动 569 像素...***0m
+***32m2026-01-27 02:41:16***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m430***0m - ***1m已加载页面: https://linux.do/t/topic/1483685/5***0m
+***32m2026-01-27 02:41:16***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m448***0m - ***1m等待 2.19 秒...***0m
+***32m2026-01-27 02:41:18***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m428***0m - ***1m向下滚动 562 像素...***0m
+***32m2026-01-27 02:41:18***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m430***0m - ***1m已加载页面: https://linux.do/t/topic/1483685/8***0m
+***32m2026-01-27 02:41:18***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m448***0m - ***1m等待 3.34 秒...***0m
+***32m2026-01-27 02:41:21***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m428***0m - ***1m向下滚动 595 像素...***0m
+***32m2026-01-27 02:41:21***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m430***0m - ***1m已加载页面: https://linux.do/t/topic/1483685/11***0m
+***32m2026-01-27 02:41:21***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m448***0m - ***1m等待 2.70 秒...***0m
+***32m2026-01-27 02:41:24***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m428***0m - ***1m向下滚动 648 像素...***0m
+***32m2026-01-27 02:41:24***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m430***0m - ***1m已加载页面: https://linux.do/t/topic/1483685/14***0m
+***32m2026-01-27 02:41:24***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m448***0m - ***1m等待 3.91 秒...***0m
+***32m2026-01-27 02:41:28***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m428***0m - ***1m向下滚动 591 像素...***0m
+***32m2026-01-27 02:41:28***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m430***0m - ***1m已加载页面: https://linux.do/t/topic/1483685/14***0m
+***32m2026-01-27 02:41:28***0m | ***32m***1mSUCCESS ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m444***0m - ***32m***1m已到达页面底部，退出浏览***0m
+***32m2026-01-27 02:41:28***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_click_like***0m:***36m461***0m - ***1m帖子可能已经点过赞了***0m
+***32m2026-01-27 02:41:28***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m428***0m - ***1m向下滚动 615 像素...***0m
+***32m2026-01-27 02:41:28***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m430***0m - ***1m已加载页面: https://linux.do/t/topic/1519385/1***0m
+***32m2026-01-27 02:41:28***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m448***0m - ***1m等待 3.34 秒...***0m
+***32m2026-01-27 02:41:31***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m428***0m - ***1m向下滚动 608 像素...***0m
+***32m2026-01-27 02:41:31***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m430***0m - ***1m已加载页面: https://linux.do/t/topic/1519385/1***0m
+***32m2026-01-27 02:41:31***0m | ***32m***1mSUCCESS ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m444***0m - ***32m***1m已到达页面底部，退出浏览***0m
+***32m2026-01-27 02:41:33***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m428***0m - ***1m向下滚动 640 像素...***0m
+***32m2026-01-27 02:41:34***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m430***0m - ***1m已加载页面: https://linux.do/t/topic/1519237***0m
+***32m2026-01-27 02:41:34***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m448***0m - ***1m等待 2.78 秒...***0m
+***32m2026-01-27 02:41:37***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m428***0m - ***1m向下滚动 553 像素...***0m
+***32m2026-01-27 02:41:37***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m430***0m - ***1m已加载页面: https://linux.do/t/topic/1519237/2***0m
+***32m2026-01-27 02:41:37***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m448***0m - ***1m等待 3.15 秒...***0m
+***32m2026-01-27 02:41:40***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m428***0m - ***1m向下滚动 564 像素...***0m
+***32m2026-01-27 02:41:40***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m430***0m - ***1m已加载页面: https://linux.do/t/topic/1519237/4***0m
+***32m2026-01-27 02:41:40***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m448***0m - ***1m等待 2.55 秒...***0m
+***32m2026-01-27 02:41:43***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m428***0m - ***1m向下滚动 615 像素...***0m
+***32m2026-01-27 02:41:43***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m430***0m - ***1m已加载页面: https://linux.do/t/topic/1519237/7***0m
+***32m2026-01-27 02:41:43***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m448***0m - ***1m等待 3.00 秒...***0m
+***32m2026-01-27 02:41:46***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m428***0m - ***1m向下滚动 559 像素...***0m
+***32m2026-01-27 02:41:46***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m430***0m - ***1m已加载页面: https://linux.do/t/topic/1519237/10***0m
+***32m2026-01-27 02:41:46***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m448***0m - ***1m等待 2.98 秒...***0m
+***32m2026-01-27 02:41:49***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m428***0m - ***1m向下滚动 550 像素...***0m
+***32m2026-01-27 02:41:49***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m430***0m - ***1m已加载页面: https://linux.do/t/topic/1519237/13***0m
+***32m2026-01-27 02:41:49***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m448***0m - ***1m等待 3.31 秒...***0m
+***32m2026-01-27 02:41:52***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m428***0m - ***1m向下滚动 644 像素...***0m
+***32m2026-01-27 02:41:52***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m430***0m - ***1m已加载页面: https://linux.do/t/topic/1519237/15***0m
+***32m2026-01-27 02:41:52***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m448***0m - ***1m等待 2.10 秒...***0m
+***32m2026-01-27 02:41:54***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m428***0m - ***1m向下滚动 630 像素...***0m
+***32m2026-01-27 02:41:54***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m430***0m - ***1m已加载页面: https://linux.do/t/topic/1519237/15***0m
+***32m2026-01-27 02:41:54***0m | ***32m***1mSUCCESS ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m444***0m - ***32m***1m已到达页面底部，退出浏览***0m
+***32m2026-01-27 02:41:57***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_click_like***0m:***36m456***0m - ***1m找到未点赞的帖子，准备点赞***0m
+***32m2026-01-27 02:42:27***0m | ***31m***1mERROR   ***0m | ***36mplatforms.linuxdo***0m:***36m_click_like***0m:***36m463***0m - ***31m***1m点赞失败: ElementHandle.click: Timeout 30000ms exceeded.
+Call log:
+  - attempting click action
+    - waiting for element to be visible, enabled and stable
+    - element is visible, enabled and stable
+    - scrolling into view if needed
+    - done scrolling
+    - <div class="dialog-body">…</div> from <div tabindex="-1" role="dialog" aria-modal="true" id="dialog-holder" class="dialog-container " aria-labelledby="dialog-title">…</div> subtree intercepts pointer events
+  - retrying click action
+    - waiting for element to be visible, enabled and stable
+    - element is visible, enabled and stable
+    - scrolling into view if needed
+    - done scrolling
+    - <div class="dialog-overlay" data-a11y-dialog-hide=""></div> from <div tabindex="-1" role="dialog" aria-modal="true" id="dialog-holder" class="dialog-container " aria-labelledby="dialog-title">…</div> subtree intercepts pointer events
+  - retrying click action
+    - waiting 20ms
+    - waiting for element to be visible, enabled and stable
+    - element is visible, enabled and stable
+    - scrolling into view if needed
+    - done scrolling
+    - <div class="dialog-body">…</div> from <div tabindex="-1" role="dialog" aria-modal="true" id="dialog-holder" class="dialog-container " aria-labelledby="dialog-title">…</div> subtree intercepts pointer events
+  2 × retrying click action
+      - waiting 100ms
+      - waiting for element to be visible, enabled and stable
+      - element is visible, enabled and stable
+      - scrolling into view if needed
+      - done scrolling
+      - <div class="dialog-overlay" data-a11y-dialog-hide=""></div> from <div tabindex="-1" role="dialog" aria-modal="true" id="dialog-holder" class="dialog-container " aria-labelledby="dialog-title">…</div> subtree intercepts pointer events
+  13 × retrying click action
+       - waiting 500ms
+       - waiting for element to be visible, enabled and stable
+       - element is visible, enabled and stable
+       - scrolling into view if needed
+       - done scrolling
+       - <div class="dialog-overlay" data-a11y-dialog-hide=""></div> from <div tabindex="-1" role="dialog" aria-modal="true" id="dialog-holder" class="dialog-container " aria-labelledby="dialog-title">…</div> subtree intercepts pointer events
+     - retrying click action
+       - waiting 500ms
+       - waiting for element to be visible, enabled and stable
+       - element is visible, enabled and stable
+       - scrolling into view if needed
+       - done scrolling
+       - <div class="dialog-body">…</div> from <div tabindex="-1" role="dialog" aria-modal="true" id="dialog-holder" class="dialog-container " aria-labelledby="dialog-title">…</div> subtree intercepts pointer events
+     - retrying click action
+       - waiting 500ms
+       - waiting for element to be visible, enabled and stable
+       - element is visible, enabled and stable
+       - scrolling into view if needed
+       - done scrolling
+       - <div class="dialog-overlay" data-a11y-dialog-hide=""></div> from <div tabindex="-1" role="dialog" aria-modal="true" id="dialog-holder" class="dialog-container " aria-labelledby="dialog-title">…</div> subtree intercepts pointer events
+     - retrying click action
+       - waiting 500ms
+       - waiting for element to be visible, enabled and stable
+       - element is visible, enabled and stable
+       - scrolling into view if needed
+       - done scrolling
+       - <div class="dialog-overlay" data-a11y-dialog-hide=""></div> from <div tabindex="-1" role="dialog" aria-modal="true" id="dialog-holder" class="dialog-container " aria-labelledby="dialog-title">…</div> subtree intercepts pointer events
+  - retrying click action
+    - waiting 500ms
+    - waiting for element to be visible, enabled and stable
+    - element is visible, enabled and stable
+    - scrolling into view if needed
+    - done scrolling
+    - <div class="dialog-overlay" data-a11y-dialog-hide=""></div> from <div tabindex="-1" role="dialog" aria-modal="true" id="dialog-holder" class="dialog-container " aria-labelledby="dialog-title">…</div> subtree intercepts pointer events
+  - retrying click action
+    - waiting 500ms
+    - waiting for element to be visible, enabled and stable
+    - element is visible, enabled and stable
+    - scrolling into view if needed
+    - done scrolling
+    - <div class="dialog-body">…</div> from <div tabindex="-1" role="dialog" aria-modal="true" id="dialog-holder" class="dialog-container " aria-labelledby="dialog-title">…</div> subtree intercepts pointer events
+  - retrying click action
+    - waiting 500ms
+***0m
+***32m2026-01-27 02:42:27***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m428***0m - ***1m向下滚动 571 像素...***0m
+***32m2026-01-27 02:42:27***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m430***0m - ***1m已加载页面: https://linux.do/t/topic/1519309***0m
+***32m2026-01-27 02:42:27***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m448***0m - ***1m等待 3.40 秒...***0m
+***32m2026-01-27 02:42:31***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m428***0m - ***1m向下滚动 585 像素...***0m
+***32m2026-01-27 02:42:31***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m430***0m - ***1m已加载页面: https://linux.do/t/topic/1519309***0m
+***32m2026-01-27 02:42:31***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m448***0m - ***1m等待 2.83 秒...***0m
+***32m2026-01-27 02:42:33***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m428***0m - ***1m向下滚动 579 像素...***0m
+***32m2026-01-27 02:42:33***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m430***0m - ***1m已加载页面: https://linux.do/t/topic/1519309/7***0m
+***32m2026-01-27 02:42:33***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m448***0m - ***1m等待 3.12 秒...***0m
+***32m2026-01-27 02:42:37***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m428***0m - ***1m向下滚动 634 像素...***0m
+***32m2026-01-27 02:42:37***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m430***0m - ***1m已加载页面: https://linux.do/t/topic/1519309/7***0m
+***32m2026-01-27 02:42:37***0m | ***32m***1mSUCCESS ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m444***0m - ***32m***1m已到达页面底部，退出浏览***0m
+***32m2026-01-27 02:42:37***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m428***0m - ***1m向下滚动 575 像素...***0m
+***32m2026-01-27 02:42:37***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m430***0m - ***1m已加载页面: https://linux.do/t/topic/1519138/1?__cf_chl_rt_tk=S2oJP6qki66LzlEAZYu7pJ.g5gKuI3rFZVRXT27OXVA-1769481757-1.0.1.1-fWg55EpDhZnzC4PqTB_lT3yRK__n6suLX4z1QhtUv_0***0m
+***32m2026-01-27 02:42:37***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m448***0m - ***1m等待 3.78 秒...***0m
+***32m2026-01-27 02:42:40***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m428***0m - ***1m向下滚动 585 像素...***0m
+***32m2026-01-27 02:42:40***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m430***0m - ***1m已加载页面: https://linux.do/t/topic/1519138/1***0m
+***32m2026-01-27 02:42:40***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m448***0m - ***1m等待 2.86 秒...***0m
+***32m2026-01-27 02:42:43***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m428***0m - ***1m向下滚动 603 像素...***0m
+***32m2026-01-27 02:42:43***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m430***0m - ***1m已加载页面: https://linux.do/t/topic/1519138/1***0m
+***32m2026-01-27 02:42:43***0m | ***32m***1mSUCCESS ***0m | ***36mplatforms.linuxdo***0m:***36m_browse_post***0m:***36m444***0m - ***32m***1m已到达页面底部，退出浏览***0m
+***32m2026-01-27 02:42:43***0m | ***1mINFO    ***0m | ***36mplatforms.linuxdo***0m:***36m_click_topics***0m:***36m401***0m - ***1m浏览了 15 个帖子***0m
+***32m2026-01-27 02:42:43***0m | ***32m***1mSUCCESS ***0m | ***36mplatforms.base***0m:***36mrun***0m:***36m144***0m - ***32m***1m***LinuxDo*** 签到成功: 小号***0m
+***32m2026-01-27 02:42:43***0m | ***1mINFO    ***0m | ***36mplatforms.base***0m:***36mrun***0m:***36m126***0m - ***1m***AnyRouter (anyrouter)*** 开始签到: anyrouter1***0m
+***32m2026-01-27 02:42:43***0m | ***1mINFO    ***0m | ***36mplatforms.anyrouter***0m:***36m_get_waf_cookies***0m:***36m168***0m - ***1m***anyrouter1*** 启动浏览器获取 WAF cookies...***0m
+***32m2026-01-27 02:42:44***0m | ***1mINFO    ***0m | ***36mplatforms.anyrouter***0m:***36m_get_waf_cookies***0m:***36m194***0m - ***1m***anyrouter1*** 访问登录页面获取初始 cookies...***0m
+***32m2026-01-27 02:42:46***0m | ***1mINFO    ***0m | ***36mplatforms.anyrouter***0m:***36m_get_waf_cookies***0m:***36m215***0m - ***1m***anyrouter1*** 获取到 3 个 WAF cookies***0m
+***32m2026-01-27 02:42:46***0m | ***32m***1mSUCCESS ***0m | ***36mplatforms.anyrouter***0m:***36m_get_waf_cookies***0m:***36m224***0m - ***32m***1m***anyrouter1*** 成功获取所有 WAF cookies***0m
+***32m2026-01-27 02:42:47***0m | ***1mINFO    ***0m | ***36mplatforms.base***0m:***36mrun***0m:***36m138***0m - ***1m***AnyRouter (anyrouter)*** 登录成功: anyrouter1***0m
+***32m2026-01-27 02:42:47***0m | ***1mINFO    ***0m | ***36mplatforms.anyrouter***0m:***36mcheckin***0m:***36m99***0m - ***1m***anyrouter1*** 💰 当前余额: $3013.91, 已使用: $161.09***0m
+***32m2026-01-27 02:42:47***0m | ***1mINFO    ***0m | ***36mplatforms.anyrouter***0m:***36m_execute_check_in***0m:***36m283***0m - ***1m***anyrouter1*** 执行签到请求***0m
+***32m2026-01-27 02:42:47***0m | ***1mINFO    ***0m | ***36mplatforms.anyrouter***0m:***36m_execute_check_in***0m:***36m296***0m - ***1m***anyrouter1*** 响应状态码: 200***0m
+***32m2026-01-27 02:42:47***0m | ***32m***1mSUCCESS ***0m | ***36mplatforms.anyrouter***0m:***36m_execute_check_in***0m:***36m302***0m - ***32m***1m***anyrouter1*** 签到成功!***0m
+***32m2026-01-27 02:42:47***0m | ***32m***1mSUCCESS ***0m | ***36mplatforms.base***0m:***36mrun***0m:***36m144***0m - ***32m***1m***AnyRouter (anyrouter)*** 签到成功: anyrouter1***0m
+***32m2026-01-27 02:42:47***0m | ***1mINFO    ***0m | ***36mplatforms.base***0m:***36mrun***0m:***36m126***0m - ***1m***AnyRouter (anyrouter)*** 开始签到: anyrouter2***0m
+***32m2026-01-27 02:42:47***0m | ***1mINFO    ***0m | ***36mplatforms.anyrouter***0m:***36m_get_waf_cookies***0m:***36m168***0m - ***1m***anyrouter2*** 启动浏览器获取 WAF cookies...***0m
+***32m2026-01-27 02:42:48***0m | ***1mINFO    ***0m | ***36mplatforms.anyrouter***0m:***36m_get_waf_cookies***0m:***36m194***0m - ***1m***anyrouter2*** 访问登录页面获取初始 cookies...***0m
+***32m2026-01-27 02:42:49***0m | ***1mINFO    ***0m | ***36mplatforms.anyrouter***0m:***36m_get_waf_cookies***0m:***36m215***0m - ***1m***anyrouter2*** 获取到 3 个 WAF cookies***0m
+***32m2026-01-27 02:42:49***0m | ***32m***1mSUCCESS ***0m | ***36mplatforms.anyrouter***0m:***36m_get_waf_cookies***0m:***36m224***0m - ***32m***1m***anyrouter2*** 成功获取所有 WAF cookies***0m
+***32m2026-01-27 02:42:49***0m | ***1mINFO    ***0m | ***36mplatforms.base***0m:***36mrun***0m:***36m138***0m - ***1m***AnyRouter (anyrouter)*** 登录成功: anyrouter2***0m
+***32m2026-01-27 02:42:49***0m | ***1mINFO    ***0m | ***36mplatforms.anyrouter***0m:***36mcheckin***0m:***36m99***0m - ***1m***anyrouter2*** 💰 当前余额: $2725.0, 已使用: $0.0***0m
+***32m2026-01-27 02:42:49***0m | ***1mINFO    ***0m | ***36mplatforms.anyrouter***0m:***36m_execute_check_in***0m:***36m283***0m - ***1m***anyrouter2*** 执行签到请求***0m
+***32m2026-01-27 02:42:49***0m | ***1mINFO    ***0m | ***36mplatforms.anyrouter***0m:***36m_execute_check_in***0m:***36m296***0m - ***1m***anyrouter2*** 响应状态码: 200***0m
+***32m2026-01-27 02:42:49***0m | ***32m***1mSUCCESS ***0m | ***36mplatforms.anyrouter***0m:***36m_execute_check_in***0m:***36m302***0m - ***32m***1m***anyrouter2*** 签到成功!***0m
+***32m2026-01-27 02:42:49***0m | ***32m***1mSUCCESS ***0m | ***36mplatforms.base***0m:***36mrun***0m:***36m144***0m - ***32m***1m***AnyRouter (anyrouter)*** 签到成功: anyrouter2***0m
+***32m2026-01-27 02:42:49***0m | ***1mINFO    ***0m | ***36m__main__***0m:***36mrun_checkin***0m:***36m161***0m - ***1m签到完成 - 成功: 3, 失败: 1, 跳过: 0***0m
+***32m2026-01-27 02:42:52***0m | ***32m***1mSUCCESS ***0m | ***36mutils.notify***0m:***36mpush_message***0m:***36m150***0m - ***32m***1m***Email*** 推送成功***0m
+--------------Connect Info-----------------
++------------------------+---------------------+-----------+
+|          项目          |        当前         |   要求    |
++------------------------+---------------------+-----------+
+|        访问次数        | 25% (25 / 100 天数) |    50%    |
+|       回复的话题       |        ≥ 17         |    10     |
+|       浏览的话题       |         83          |    500    |
+| 浏览的话题（所有时间） |         115         |    200    |
+|        已读帖子        |        1882         |   20000   |
+|  已读帖子（所有时间）  |        2482         |    500    |
+|      被举报的帖子      |          0          | 最多 5 个 |
+|     发起举报的用户     |          0          | 最多 5 个 |
+|          点赞          |         211         |    30     |
+|          获赞          |         32          |    20     |
+|   获赞：被点赞的天数   |         15          |     7     |
+|   获赞：点赞用户数量   |         31          |     5     |
+| 被禁言（过去 6 个月）  |          0          |     0     |
+| 被封禁（过去 6 个月）  |          0          |     0     |
++------------------------+---------------------+-----------+

@@ -390,8 +390,8 @@ class LinuxDoAdapter(BasePlatformAdapter):
         
         logger.info(f"发现 {len(topic_urls)} 个可浏览帖子，随机选择浏览")
         
-        # 每次浏览 15 个帖子
-        browse_count = 15
+        # 每次浏览 3 个帖子（测试用，正式环境改回 15）
+        browse_count = 3
         actual_count = min(browse_count, len(topic_urls))
         selected_urls = random.sample(topic_urls, actual_count)
         
@@ -450,23 +450,47 @@ class LinuxDoAdapter(BasePlatformAdapter):
     
     async def _dismiss_dialog(self, page: Page) -> None:
         """关闭页面上可能存在的弹窗"""
-        try:
-            # 检查是否有 dialog 弹窗
-            dialog_holder = await page.query_selector("#dialog-holder.dialog-container")
-            if dialog_holder:
-                # 尝试点击关闭按钮
-                close_btn = await page.query_selector(".dialog-close, [data-a11y-dialog-hide]")
+        for _ in range(3):  # 最多尝试 3 次
+            try:
+                # 检查是否有 dialog 弹窗
+                dialog_holder = await page.query_selector("#dialog-holder.dialog-container")
+                if not dialog_holder:
+                    return
+                
+                # 检查弹窗是否可见
+                is_visible = await dialog_holder.is_visible()
+                if not is_visible:
+                    return
+                
+                logger.info("检测到弹窗，尝试关闭...")
+                
+                # 方法1: 点击 overlay 背景关闭
+                overlay = await page.query_selector(".dialog-overlay[data-a11y-dialog-hide]")
+                if overlay:
+                    await overlay.click(force=True, timeout=2000)
+                    await asyncio.sleep(0.5)
+                    continue
+                
+                # 方法2: 点击关闭按钮
+                close_btn = await page.query_selector(".dialog-close")
                 if close_btn:
-                    await close_btn.click(timeout=2000)
-                    logger.info("已关闭弹窗")
+                    await close_btn.click(force=True, timeout=2000)
                     await asyncio.sleep(0.5)
-                else:
-                    # 按 Escape 键关闭
-                    await page.keyboard.press("Escape")
-                    logger.info("按 Escape 关闭弹窗")
-                    await asyncio.sleep(0.5)
-        except Exception:
-            pass  # 没有弹窗或关闭失败，继续执行
+                    continue
+                
+                # 方法3: 按 Escape 键
+                await page.keyboard.press("Escape")
+                await asyncio.sleep(0.5)
+                
+            except Exception as e:
+                logger.debug(f"关闭弹窗尝试失败: {e}")
+                # 最后手段：用 JS 直接移除弹窗
+                try:
+                    await page.evaluate("document.querySelector('#dialog-holder')?.remove()")
+                    logger.info("用 JS 移除了弹窗")
+                except Exception:
+                    pass
+                break
 
     async def _click_like(self, page: Page) -> None:
         """点赞帖子"""

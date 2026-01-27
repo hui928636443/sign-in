@@ -84,25 +84,48 @@ class PlatformManager:
         return self.results
     
     async def _run_all_linuxdo(self) -> list[CheckinResult]:
-        """运行所有 LinuxDo 账号签到"""
-        results = []
-        
+        """运行所有 LinuxDo 账号签到（并发执行，最多同时 3 个）"""
         if not self.config.linuxdo_accounts:
             logger.warning("LinuxDo 未配置")
-            return results
+            return []
         
-        for i, account in enumerate(self.config.linuxdo_accounts):
-            adapter = LinuxDoAdapter(
-                username=account.username,
-                password=account.password,
-                browse_enabled=account.browse_enabled,
-                account_name=account.get_display_name(i),
-            )
-            
-            result = await adapter.run()
-            results.append(result)
+        # 并发限制：最多同时 3 个账号
+        semaphore = asyncio.Semaphore(3)
         
-        return results
+        async def run_with_semaphore(account, index: int) -> CheckinResult:
+            async with semaphore:
+                logger.info(f"开始执行 LinuxDo 账号 {index + 1}: {account.get_display_name(index)}")
+                adapter = LinuxDoAdapter(
+                    username=account.username,
+                    password=account.password,
+                    browse_enabled=account.browse_enabled,
+                    account_name=account.get_display_name(index),
+                )
+                return await adapter.run()
+        
+        # 并发执行所有账号
+        tasks = [
+            run_with_semaphore(account, i)
+            for i, account in enumerate(self.config.linuxdo_accounts)
+        ]
+        
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        
+        # 处理异常结果
+        final_results = []
+        for i, result in enumerate(results):
+            if isinstance(result, Exception):
+                logger.error(f"LinuxDo 账号 {i + 1} 执行异常: {result}")
+                final_results.append(CheckinResult(
+                    platform="LinuxDo",
+                    account=self.config.linuxdo_accounts[i].get_display_name(i),
+                    status=CheckinStatus.FAILED,
+                    message=f"执行异常: {str(result)}",
+                ))
+            else:
+                final_results.append(result)
+        
+        return final_results
     
     async def _run_linuxdo(self) -> CheckinResult:
         """运行 LinuxDo 签到（向后兼容，运行第一个账号）"""
