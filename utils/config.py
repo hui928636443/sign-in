@@ -30,6 +30,7 @@ class LinuxDoAccount:
     username: str
     password: str
     browse_enabled: bool = True
+    browse_duration: int = 120  # 浏览时长（秒），默认 2 分钟
     name: Optional[str] = None
     
     @classmethod
@@ -38,11 +39,18 @@ class LinuxDoAccount:
         browse_enabled = data.get("browse_enabled", True)
         if isinstance(browse_enabled, str):
             browse_enabled = browse_enabled.lower() not in ["false", "0", "off", "no"]
+        
+        # 浏览时长，默认 120 秒
+        browse_duration = data.get("browse_duration", 120)
+        if isinstance(browse_duration, str):
+            browse_duration = int(browse_duration)
+        
         name = data.get("name") or f"Account {index + 1}"
         return cls(
             username=data["username"],
             password=data["password"],
             browse_enabled=browse_enabled,
+            browse_duration=browse_duration,
             name=name,
         )
     

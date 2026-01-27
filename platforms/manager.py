@@ -92,28 +92,25 @@ class PlatformManager:
         return self.results
     
     async def _run_all_linuxdo(self) -> list[CheckinResult]:
-        """运行所有 LinuxDo 账号签到（并发执行，最多同时 3 个）"""
+        """运行所有 LinuxDo 账号签到（并发执行）"""
         if not self.config.linuxdo_accounts:
             logger.warning("LinuxDo 未配置")
             return []
         
-        # 并发限制：最多同时 3 个账号
-        semaphore = asyncio.Semaphore(3)
+        async def run_account(account, index: int) -> CheckinResult:
+            logger.info(f"开始执行 LinuxDo 账号 {index + 1}: {account.get_display_name(index)}")
+            adapter = LinuxDoAdapter(
+                username=account.username,
+                password=account.password,
+                browse_enabled=account.browse_enabled,
+                browse_duration=account.browse_duration,
+                account_name=account.get_display_name(index),
+            )
+            return await adapter.run()
         
-        async def run_with_semaphore(account, index: int) -> CheckinResult:
-            async with semaphore:
-                logger.info(f"开始执行 LinuxDo 账号 {index + 1}: {account.get_display_name(index)}")
-                adapter = LinuxDoAdapter(
-                    username=account.username,
-                    password=account.password,
-                    browse_enabled=account.browse_enabled,
-                    account_name=account.get_display_name(index),
-                )
-                return await adapter.run()
-        
-        # 并发执行所有账号
+        # 并发执行所有账号（无限制）
         tasks = [
-            run_with_semaphore(account, i)
+            run_account(account, i)
             for i, account in enumerate(self.config.linuxdo_accounts)
         ]
         

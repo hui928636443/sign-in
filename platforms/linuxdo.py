@@ -42,6 +42,7 @@ class LinuxDoAdapter(BasePlatformAdapter):
         username: str,
         password: str,
         browse_enabled: bool = True,
+        browse_duration: int = 120,
         account_name: Optional[str] = None,
     ):
         """初始化 LinuxDo 适配器
@@ -50,11 +51,13 @@ class LinuxDoAdapter(BasePlatformAdapter):
             username: LinuxDo 用户名
             password: LinuxDo 密码
             browse_enabled: 是否启用浏览帖子功能
+            browse_duration: 浏览时长（秒），默认 120 秒（2分钟）
             account_name: 账号显示名称（可选）
         """
         self.username = username
         self.password = password
         self.browse_enabled = browse_enabled
+        self.browse_duration = browse_duration
         self._account_name = account_name
         
         self._playwright = None
@@ -64,6 +67,9 @@ class LinuxDoAdapter(BasePlatformAdapter):
         self.session: Optional[requests.Session] = None
         self._connect_info: Optional[dict] = None
         self._hot_topics: list[dict] = []
+        
+        # 随机化的 User-Agent（在初始化时生成，保持一致性）
+        self._user_agent: Optional[str] = None
     
     @property
     def platform_name(self) -> str:
@@ -72,6 +78,42 @@ class LinuxDoAdapter(BasePlatformAdapter):
     @property
     def account_name(self) -> str:
         return self._account_name if self._account_name else self.username
+    
+    def _get_random_user_agent(self) -> str:
+        """生成随机 User-Agent（模拟不同的 Chrome 版本和系统）"""
+        chrome_versions = [
+            "120.0.0.0", "121.0.0.0", "122.0.0.0", "123.0.0.0", "124.0.0.0",
+            "125.0.0.0", "126.0.0.0", "127.0.0.0", "128.0.0.0", "129.0.0.0",
+            "130.0.0.0", "131.0.0.0", "132.0.0.0",
+        ]
+        
+        # Windows 10/11 的不同版本
+        windows_versions = [
+            "Windows NT 10.0; Win64; x64",
+            "Windows NT 10.0; WOW64",
+        ]
+        
+        chrome_ver = random.choice(chrome_versions)
+        win_ver = random.choice(windows_versions)
+        
+        return (
+            f"Mozilla/5.0 ({win_ver}) AppleWebKit/537.36 "
+            f"(KHTML, like Gecko) Chrome/{chrome_ver} Safari/537.36"
+        )
+    
+    def _get_random_viewport(self) -> dict:
+        """生成随机 viewport 尺寸（模拟不同的屏幕分辨率）"""
+        viewports = [
+            {"width": 1920, "height": 1080},  # 1080p
+            {"width": 1366, "height": 768},   # 常见笔记本
+            {"width": 1536, "height": 864},   # 缩放后的 1080p
+            {"width": 1440, "height": 900},   # MacBook
+            {"width": 1600, "height": 900},   # 16:9 宽屏
+            {"width": 1680, "height": 1050},  # 16:10 宽屏
+            {"width": 1280, "height": 720},   # 720p
+            {"width": 1280, "height": 800},   # 常见笔记本
+        ]
+        return random.choice(viewports)
     
     async def _init_browser(self) -> None:
         """初始化 Patchright 浏览器"""
@@ -86,13 +128,17 @@ class LinuxDoAdapter(BasePlatformAdapter):
             ]
         )
         
-        # 创建上下文，设置 viewport 和 user agent
+        # 随机化 User-Agent 和 viewport（每个账户不同）
+        self._user_agent = self._get_random_user_agent()
+        viewport = self._get_random_viewport()
+        
+        logger.debug(f"使用 UA: {self._user_agent}")
+        logger.debug(f"使用 viewport: {viewport['width']}x{viewport['height']}")
+        
+        # 创建上下文，设置随机化的 viewport 和 user agent
         self.context = await self.browser.new_context(
-            viewport={"width": 1920, "height": 1080},
-            user_agent=(
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-                "(KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36"
-            ),
+            viewport=viewport,
+            user_agent=self._user_agent,
             locale="zh-CN",
             timezone_id="Asia/Shanghai",
         )
@@ -100,13 +146,10 @@ class LinuxDoAdapter(BasePlatformAdapter):
         self.page = await self.context.new_page()
     
     def _init_session(self) -> None:
-        """初始化 HTTP 会话"""
+        """初始化 HTTP 会话（使用与浏览器相同的 User-Agent）"""
         self.session = requests.Session()
         self.session.headers.update({
-            "User-Agent": (
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-                "(KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36 Edg/142.0.0.0"
-            ),
+            "User-Agent": self._user_agent or self._get_random_user_agent(),
             "Accept": "application/json, text/javascript, */*; q=0.01",
             "Accept-Language": "zh-CN,zh;q=0.9",
         })
@@ -121,10 +164,7 @@ class LinuxDoAdapter(BasePlatformAdapter):
         # Step 1: 获取 CSRF Token
         logger.info("获取 CSRF token...")
         headers = {
-            "User-Agent": (
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-                "(KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36 Edg/142.0.0.0"
-            ),
+            "User-Agent": self._user_agent,
             "Accept": "application/json, text/javascript, */*; q=0.01",
             "Accept-Language": "zh-CN,zh;q=0.9",
             "X-Requested-With": "XMLHttpRequest",
@@ -388,18 +428,29 @@ class LinuxDoAdapter(BasePlatformAdapter):
             logger.error("过滤后没有可浏览的帖子")
             return 0
         
-        logger.info(f"发现 {len(topic_urls)} 个可浏览帖子，随机选择浏览")
+        logger.info(f"发现 {len(topic_urls)} 个可浏览帖子，开始按时间浏览（目标 {self.browse_duration} 秒）")
         
-        # 每次浏览 15 个帖子
-        browse_count = 15
-        actual_count = min(browse_count, len(topic_urls))
-        selected_urls = random.sample(topic_urls, actual_count)
+        # 按时间浏览，而不是按数量
+        start_time = time.time()
+        browsed_count = 0
+        random.shuffle(topic_urls)  # 打乱顺序
         
-        for url in selected_urls:
+        for url in topic_urls:
+            # 检查是否已达到目标时间
+            elapsed = time.time() - start_time
+            if elapsed >= self.browse_duration:
+                logger.info(f"已达到目标浏览时间 {self.browse_duration} 秒")
+                break
+            
+            remaining = self.browse_duration - elapsed
+            logger.info(f"浏览第 {browsed_count + 1} 个帖子，已用时 {elapsed:.0f}s，剩余 {remaining:.0f}s")
+            
             await self._click_one_topic(url)
+            browsed_count += 1
         
-        logger.info(f"浏览了 {actual_count} 个帖子")
-        return actual_count
+        total_time = time.time() - start_time
+        logger.info(f"浏览完成，共浏览 {browsed_count} 个帖子，用时 {total_time:.0f} 秒")
+        return browsed_count
     
     async def _click_one_topic(self, topic_url: str) -> bool:
         """点击单个主题帖"""
@@ -446,14 +497,38 @@ class LinuxDoAdapter(BasePlatformAdapter):
         return None
     
     async def _send_timings(self, page: Page, topic_id: int, time_ms: int) -> None:
-        """发送阅读时间到 Discourse timings 接口"""
+        """发送阅读时间到 Discourse timings 接口
+        
+        会自动获取页面上所有楼层的 post_number，并为每个楼层发送阅读时间
+        """
         try:
             # 通过浏览器发送 timings 请求，自动携带 cookies 和 CSRF token
+            # 获取所有楼层的 post_number 并构建 timings 参数
             await page.evaluate(f"""
                 (async () => {{
                     try {{
                         const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
                         if (!csrfToken) return;
+                        
+                        // 获取所有楼层的 post_number
+                        const posts = document.querySelectorAll('.topic-post');
+                        const timingsParams = [];
+                        const timePerPost = Math.floor({time_ms} / Math.max(posts.length, 1));
+                        
+                        posts.forEach((post, index) => {{
+                            // Discourse 的 post_number 从 1 开始
+                            const postNumber = index + 1;
+                            // 每个楼层至少 2000ms 的阅读时间
+                            const postTime = Math.max(timePerPost, 2000);
+                            timingsParams.push(`timings%5B${{postNumber}}%5D=${{postTime}}`);
+                        }});
+                        
+                        // 如果没有找到楼层，至少发送第一楼的时间
+                        if (timingsParams.length === 0) {{
+                            timingsParams.push(`timings%5B1%5D={time_ms}`);
+                        }}
+                        
+                        const body = `topic_id={topic_id}&topic_time={time_ms}&${{timingsParams.join('&')}}`;
                         
                         await fetch('/topics/timings', {{
                             method: 'POST',
@@ -462,7 +537,7 @@ class LinuxDoAdapter(BasePlatformAdapter):
                                 'X-CSRF-Token': csrfToken,
                                 'X-Requested-With': 'XMLHttpRequest'
                             }},
-                            body: 'topic_id={topic_id}&topic_time={time_ms}&timings%5B1%5D={time_ms}'
+                            body: body
                         }});
                     }} catch (e) {{}}
                 }})();
@@ -472,46 +547,150 @@ class LinuxDoAdapter(BasePlatformAdapter):
             logger.debug(f"发送 timings 失败: {e}")
     
     async def _browse_post(self, page: Page) -> None:
-        """浏览帖子内容，确保足够的停留时间"""
-        start_time = time.time()
-        min_browse_time = random.uniform(4, 6)  # 最少停留 4-6 秒
-        prev_url = None
+        """浏览帖子内容，逐个楼层停留确保标记为已读
         
-        for _ in range(10):
-            scroll_distance = random.randint(550, 650)
-            logger.info(f"向下滚动 {scroll_distance} 像素...")
-            await page.evaluate(f"window.scrollBy(0, {scroll_distance})")
-            logger.info(f"已加载页面: {page.url}")
+        Discourse 论坛的阅读标记机制：
+        - 每个楼层需要在视口内停留约 1 秒才会触发 timings
+        - 右侧蓝点消失表示该楼层已被标记为已读
+        - 我们停留 2 秒以上确保稳定触发
+        
+        反检测策略：
+        - 随机停留时间（2-4秒）
+        - 偶尔回滚模拟回看
+        - 随机鼠标移动
+        - 不规则的浏览节奏
+        """
+        # 等待帖子内容加载（随机时间）
+        await asyncio.sleep(random.uniform(0.8, 1.5))
+        
+        # 获取所有楼层
+        posts = await page.query_selector_all(".topic-post")
+        
+        if not posts:
+            logger.warning("未找到楼层元素，使用滚动模式")
+            await self._browse_post_fallback(page)
+            return
+        
+        post_count = len(posts)
+        logger.info(f"帖子共有 {post_count} 个楼层，开始逐个浏览")
+        
+        # 随机决定浏览多少楼层（避免每次都浏览固定数量）
+        max_posts_to_read = min(post_count, random.randint(15, 25))
+        browsed_count = 0
+        last_scroll_back_index = -5  # 记录上次回滚的位置，避免频繁回滚
+        
+        for i, post in enumerate(posts[:max_posts_to_read]):
+            try:
+                # 滚动到该楼层
+                await post.scroll_into_view_if_needed()
+                
+                # 随机鼠标移动到帖子区域（模拟真实阅读）
+                if random.random() < 0.6:
+                    await self._random_mouse_move(page, post)
+                
+                # 停留时间：基础 2-4 秒，偶尔更长（模拟仔细阅读）
+                if random.random() < 0.15:
+                    # 15% 概率仔细阅读，停留更久
+                    wait_time = random.uniform(4.0, 7.0)
+                    logger.debug(f"楼层 {i+1}，仔细阅读 {wait_time:.1f} 秒")
+                else:
+                    wait_time = random.uniform(2.0, 4.0)
+                    logger.debug(f"楼层 {i+1}/{max_posts_to_read}，停留 {wait_time:.1f} 秒")
+                
+                await asyncio.sleep(wait_time)
+                browsed_count += 1
+                
+                # 8% 概率回滚查看之前的内容（模拟回看）
+                if i > 3 and i - last_scroll_back_index > 3 and random.random() < 0.08:
+                    scroll_back = random.randint(1, min(3, i))
+                    logger.debug(f"回滚查看第 {i+1-scroll_back} 楼")
+                    await posts[i - scroll_back].scroll_into_view_if_needed()
+                    await asyncio.sleep(random.uniform(1.5, 3.0))
+                    last_scroll_back_index = i
+                    # 滚回当前位置
+                    await post.scroll_into_view_if_needed()
+                    await asyncio.sleep(random.uniform(0.5, 1.0))
+                
+                # 6% 概率提前退出（模拟失去兴趣）
+                if i > 5 and random.random() < 0.06:
+                    logger.info(f"随机退出，已浏览 {browsed_count} 个楼层")
+                    break
+                
+                # 偶尔短暂停顿（模拟思考或分心）
+                if random.random() < 0.1:
+                    await asyncio.sleep(random.uniform(0.3, 0.8))
+                    
+            except Exception as e:
+                logger.debug(f"浏览楼层 {i+1} 失败: {e}")
+                continue
+        
+        logger.info(f"完成楼层浏览，共浏览 {browsed_count} 个楼层")
+    
+    async def _random_mouse_move(self, page: Page, element) -> None:
+        """随机移动鼠标到元素区域内（模拟真实阅读行为）"""
+        try:
+            box = await element.bounding_box()
+            if not box:
+                return
             
-            # 3% 概率随机退出（但要确保最小停留时间）
+            # 在元素区域内随机选择一个点（不是正中心）
+            x = box["x"] + random.uniform(box["width"] * 0.1, box["width"] * 0.9)
+            y = box["y"] + random.uniform(box["height"] * 0.2, box["height"] * 0.8)
+            
+            # 移动鼠标（带有轻微的随机偏移模拟手抖）
+            jitter_x = random.uniform(-3, 3)
+            jitter_y = random.uniform(-3, 3)
+            
+            await page.mouse.move(x + jitter_x, y + jitter_y)
+        except Exception:
+            pass  # 鼠标移动失败不影响主流程
+    
+    async def _browse_post_fallback(self, page: Page) -> None:
+        """回退的滚动浏览模式（当无法获取楼层元素时使用）
+        
+        使用随机滚动距离和停留时间，偶尔回滚模拟真实用户
+        """
+        start_time = time.time()
+        min_browse_time = random.uniform(8, 15)
+        scroll_count = 0
+        
+        for _ in range(15):
+            # 随机滚动距离（模拟不同的滚动习惯）
+            scroll_distance = random.randint(300, 800)
+            await page.evaluate(f"window.scrollBy(0, {scroll_distance})")
+            scroll_count += 1
+            
+            # 随机停留时间
+            if random.random() < 0.2:
+                # 20% 概率停留更久（仔细阅读）
+                await asyncio.sleep(random.uniform(3.5, 6.0))
+            else:
+                await asyncio.sleep(random.uniform(2.0, 4.0))
+            
+            # 10% 概率回滚一点（模拟回看）
+            if scroll_count > 2 and random.random() < 0.1:
+                back_distance = random.randint(150, 400)
+                await page.evaluate(f"window.scrollBy(0, -{back_distance})")
+                await asyncio.sleep(random.uniform(1.0, 2.5))
+            
+            # 随机鼠标移动
+            if random.random() < 0.4:
+                viewport = await page.evaluate("({w: window.innerWidth, h: window.innerHeight})")
+                x = random.uniform(100, viewport["w"] - 100)
+                y = random.uniform(100, viewport["h"] - 100)
+                await page.mouse.move(x, y)
+            
             elapsed = time.time() - start_time
-            if random.random() < 0.03 and elapsed >= min_browse_time:
-                logger.success("随机退出浏览")
+            at_bottom = await page.evaluate(
+                "window.scrollY + window.innerHeight >= document.body.scrollHeight - 50"
+            )
+            
+            if at_bottom and elapsed >= min_browse_time:
                 break
             
-            at_bottom = await page.evaluate(
-                "window.scrollY + window.innerHeight >= document.body.scrollHeight"
-            )
-            current_url = page.url
-            
-            if current_url != prev_url:
-                prev_url = current_url
-            elif at_bottom and prev_url == current_url:
-                # 到达底部，但要确保最小停留时间
-                if elapsed >= min_browse_time:
-                    logger.success("已到达页面底部，退出浏览")
-                    break
-                else:
-                    # 还没到最小时间，继续等待
-                    remaining = min_browse_time - elapsed
-                    logger.info(f"页面较短，额外等待 {remaining:.1f} 秒...")
-                    await asyncio.sleep(remaining)
-                    logger.success("已到达页面底部，退出浏览")
-                    break
-            
-            wait_time = random.uniform(2, 4)
-            logger.info(f"等待 {wait_time:.2f} 秒...")
-            await asyncio.sleep(wait_time)
+            # 5% 概率提前退出
+            if elapsed > 6 and random.random() < 0.05:
+                break
     
     async def _dismiss_dialog(self, page: Page) -> None:
         """关闭页面上可能存在的弹窗"""
