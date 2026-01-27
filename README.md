@@ -3,6 +3,7 @@
 ## 项目描述
 
 这个项目用于自动签到多个平台，目前支持：
+
 - **LinuxDo** - 自动登录并浏览帖子
 - **AnyRouter/AgentRouter** - 自动签到并查询余额
 
@@ -24,8 +25,8 @@
 
 #### 方式一：JSON 多账号配置（推荐）
 
-| 环境变量名称 | 描述 | 示例值 |
-|-------------|------|--------|
+| 环境变量名称         | 描述                    | 示例值     |
+| -------------------- | ----------------------- | ---------- |
 | `LINUXDO_ACCOUNTS` | LinuxDo 账号配置 (JSON) | 见下方示例 |
 
 ```json
@@ -47,39 +48,41 @@
 
 #### 方式二：单账号配置（向后兼容）
 
-| 环境变量名称 | 描述 | 示例值 |
-|-------------|------|--------|
-| `LINUXDO_USERNAME` | LinuxDo 用户名或邮箱 | `your_username` |
-| `LINUXDO_PASSWORD` | LinuxDo 密码 | `your_password` |
-| `BROWSE_ENABLED` | 是否启用浏览帖子功能 | `true` (默认) 或 `false` |
+| 环境变量名称         | 描述                 | 示例值                       |
+| -------------------- | -------------------- | ---------------------------- |
+| `LINUXDO_USERNAME` | LinuxDo 用户名或邮箱 | `your_username`            |
+| `LINUXDO_PASSWORD` | LinuxDo 密码         | `your_password`            |
+| `BROWSE_ENABLED`   | 是否启用浏览帖子功能 | `true` (默认) 或 `false` |
 
 > 注：旧版环境变量 `USERNAME` 和 `PASSWORD` 仍然可用
 
 ### AnyRouter 配置
 
-| 环境变量名称 | 描述 | 示例值 |
-|-------------|------|--------|
-| `ANYROUTER_ACCOUNTS` | AnyRouter 账号配置 (JSON) | 见下方示例 |
-| `PROVIDERS` | 自定义 Provider 配置 (JSON，可选) | 见下方示例 |
+| 环境变量名称           | 描述                              | 示例值     |
+| ---------------------- | --------------------------------- | ---------- |
+| `ANYROUTER_ACCOUNTS` | AnyRouter 账号配置 (JSON)         | 见下方示例 |
+| `PROVIDERS`          | 自定义 Provider 配置 (JSON，可选) | 见下方示例 |
 
 #### ANYROUTER_ACCOUNTS 格式
 
 ```json
 [
   {
-    "cookies": "session=xxx; token=yyy",
-    "api_user": "your_api_user",
+    "cookies": {"session": "MTc2ODc4NzQzNHxEWDhFQVFMX2dBQUJFQUVRQUFE..."},
+    "api_user": "68121",
     "provider": "anyrouter",
     "name": "账号1"
   },
   {
-    "cookies": {"session": "xxx", "token": "yyy"},
-    "api_user": "your_api_user",
-    "provider": "agentrouter",
+    "cookies": {"session": "MTc2OTEwNDAyMHxEWDhFQVFMX2dBQUJFQUVRQUFE..."},
+    "api_user": "59286",
+    "provider": "anyrouter",
     "name": "账号2"
   }
 ]
 ```
+
+> 注：`cookies` 只需要 `session` 字段即可，其他 CDN cookie（如 `acw_tc`）不需要保存。
 
 #### PROVIDERS 格式（可选）
 
@@ -101,39 +104,39 @@
 
 支持以下通知渠道（均为可选）：
 
-| 环境变量 | 描述 |
-|---------|------|
-| **Email** | |
-| `EMAIL_USER` | 发件邮箱账号 |
-| `EMAIL_PASS` | 发件邮箱密码/授权码 |
-| `EMAIL_TO` | 收件邮箱地址 |
-| `EMAIL_SENDER` | 发件人显示名称（可选） |
-| `CUSTOM_SMTP_SERVER` | 自定义 SMTP 服务器（可选） |
-| **Gotify** | |
-| `GOTIFY_URL` | Gotify 服务器地址 |
-| `GOTIFY_TOKEN` | Gotify 应用 Token |
-| `GOTIFY_PRIORITY` | 消息优先级（可选，默认 9） |
-| **Server酱 Turbo (SCT)** | |
-| `SC3_PUSH_KEY` | Server酱 Turbo SendKey (从 https://sct.ftqq.com/sendkey 获取) |
-| **wxpush** | |
-| `WXPUSH_URL` | wxpush 服务器地址 |
-| `WXPUSH_TOKEN` | wxpush Token |
-| **Telegram** | |
-| `TELEGRAM_BOT_TOKEN` | Telegram Bot Token |
-| `TELEGRAM_CHAT_ID` | Telegram Chat ID |
-| **PushPlus** | |
-| `PUSHPLUS_TOKEN` | PushPlus Token |
-| **Server酱 (旧版)** | |
-| `SERVERPUSHKEY` | Server酱 SCKEY |
-| **钉钉** | |
-| `DINGDING_WEBHOOK` | 钉钉机器人 Webhook URL |
-| **飞书** | |
-| `FEISHU_WEBHOOK` | 飞书机器人 Webhook URL |
-| **企业微信** | |
-| `WEIXIN_WEBHOOK` | 企业微信机器人 Webhook URL |
-| **Bark** | |
-| `BARK_KEY` | Bark 推送 Key |
-| `BARK_SERVER` | Bark 服务器地址（可选） |
+| 环境变量                       | 描述                                                          |
+| ------------------------------ | ------------------------------------------------------------- |
+| **Email**                |                                                               |
+| `EMAIL_USER`                 | 发件邮箱账号                                                  |
+| `EMAIL_PASS`                 | 发件邮箱密码/授权码                                           |
+| `EMAIL_TO`                   | 收件邮箱地址                                                  |
+| `EMAIL_SENDER`               | 发件人显示名称（可选）                                        |
+| `CUSTOM_SMTP_SERVER`         | 自定义 SMTP 服务器（可选）                                    |
+| **Gotify**               |                                                               |
+| `GOTIFY_URL`                 | Gotify 服务器地址                                             |
+| `GOTIFY_TOKEN`               | Gotify 应用 Token                                             |
+| `GOTIFY_PRIORITY`            | 消息优先级（可选，默认 9）                                    |
+| **Server酱 Turbo (SCT)** |                                                               |
+| `SC3_PUSH_KEY`               | Server酱 Turbo SendKey (从 https://sct.ftqq.com/sendkey 获取) |
+| **wxpush**               |                                                               |
+| `WXPUSH_URL`                 | wxpush 服务器地址                                             |
+| `WXPUSH_TOKEN`               | wxpush Token                                                  |
+| **Telegram**             |                                                               |
+| `TELEGRAM_BOT_TOKEN`         | Telegram Bot Token                                            |
+| `TELEGRAM_CHAT_ID`           | Telegram Chat ID                                              |
+| **PushPlus**             |                                                               |
+| `PUSHPLUS_TOKEN`             | PushPlus Token                                                |
+| **Server酱 (旧版)**      |                                                               |
+| `SERVERPUSHKEY`              | Server酱 SCKEY                                                |
+| **钉钉**                 |                                                               |
+| `DINGDING_WEBHOOK`           | 钉钉机器人 Webhook URL                                        |
+| **飞书**                 |                                                               |
+| `FEISHU_WEBHOOK`             | 飞书机器人 Webhook URL                                        |
+| **企业微信**             |                                                               |
+| `WEIXIN_WEBHOOK`             | 企业微信机器人 Webhook URL                                    |
+| **Bark**                 |                                                               |
+| `BARK_KEY`                   | Bark 推送 Key                                                 |
+| `BARK_SERVER`                | Bark 服务器地址（可选）                                       |
 
 ## 使用方法
 
@@ -173,17 +176,50 @@ uv run python main.py --debug
 2. 在仓库 `Settings` → `Secrets and variables` → `Actions` → `New repository secret` 中添加以下 Secrets：
 
    **必须配置（根据你要签到的平台）：**
+
    - `LINUXDO_ACCOUNTS` - LinuxDo 账号 JSON（多账号）
    - 或 `LINUXDO_USERNAME` + `LINUXDO_PASSWORD` - LinuxDo 单账号
    - `ANYROUTER_ACCOUNTS` - AnyRouter 账号 JSON
 
    **可选配置（通知，选一个即可）：**
+
    - `TELEGRAM_BOT_TOKEN` + `TELEGRAM_CHAT_ID` - Telegram 通知
    - `PUSHPLUS_TOKEN` - PushPlus 微信通知
    - `SC3_PUSH_KEY` - Server酱 Turbo 通知 (https://sct.ftqq.com/sendkey)
 
+   **防止 Actions 被禁用（推荐配置）：**
+
+   - `ACTIONS_TRIGGER_PAT` - GitHub Personal Access Token，用于保持 Actions 活跃
+
 3. 进入 `Actions` 选项卡，点击 `I understand my workflows, go ahead and enable them` 启用工作流
 4. 工作流会按计划自动运行（每12小时一次）
+
+#### 配置 ACTIONS_TRIGGER_PAT（防止 Actions 被自动禁用）
+
+GitHub 会在仓库 60 天无活动后自动禁用定时任务。配置此 Token 可防止签到任务被停用。
+
+**生成 Token：**
+
+1. 打开 https://github.com/settings/tokens?type=beta
+2. 点击 "Generate new token"
+3. 设置：
+   - Token name: `workflow-immortality`
+   - Expiration: 建议选 1 年
+   - Repository access: 选 "Only select repositories" → 选择本仓库
+   - Permissions → Repository permissions：
+     - **Actions**: `Read and write`
+     - **Workflows**: `Read and write`
+4. 点击 "Generate token"，复制生成的 Token
+
+**添加到仓库：**
+
+1. 打开仓库 Settings → Secrets and variables → Actions
+2. 点击 "New repository secret"
+3. Name: `ACTIONS_TRIGGER_PAT`
+4. Secret: 粘贴刚才复制的 Token
+5. 点击 "Add secret"
+
+配置完成后，`immortality.yml` 工作流会每月自动运行一次，保持仓库活跃。
 
 #### 手动触发
 
