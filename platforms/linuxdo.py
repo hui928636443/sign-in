@@ -386,57 +386,44 @@ class LinuxDoAdapter(BasePlatformAdapter):
             self._connect_info = {}
     
     async def _click_topics(self) -> int:
-        """点击并浏览主题帖，返回浏览数量"""
-        try:
-            # 获取所有话题行
-            topic_rows = await self.page.query_selector_all("#list-area tr")
-        except Exception:
-            topic_rows = []
-        
-        if not topic_rows:
-            logger.error("未找到主题帖")
-            return 0
-        
-        # 获取所有 href，过滤掉公告和运营反馈
+        """点击并浏览主题帖，优先浏览未读/新帖子"""
+        # 优先从未读和新帖子页面获取
         topic_urls = []
-        for row in topic_rows:
-            try:
-                # 获取整行文本，检查是否包含屏蔽分类
-                row_text = await row.inner_text()
-                should_skip = False
-                for blocked in self.BLOCKED_CATEGORIES:
-                    if blocked in row_text:
-                        should_skip = True
-                        break
-                if should_skip:
-                    continue
-                
-                # 获取链接
-                title_link = await row.query_selector(".title")
-                if not title_link:
-                    continue
-                    
-                href = await title_link.get_attribute("href")
-                if href:
-                    if not href.startswith("http"):
-                        href = f"https://linux.do{href}"
-                    topic_urls.append(href)
-            except Exception:
-                continue
+        
+        # 1. 先尝试获取未读帖子
+        unread_urls = await self._get_topics_from_page("https://linux.do/unread")
+        if unread_urls:
+            logger.info(f"发现 {len(unread_urls)} 个未读帖子")
+            topic_urls.extend(unread_urls)
+        
+        # 2. 再获取新帖子
+        new_urls = await self._get_topics_from_page("https://linux.do/new")
+        if new_urls:
+            logger.info(f"发现 {len(new_urls)} 个新帖子")
+            # 去重后添加
+            for url in new_urls:
+                if url not in topic_urls:
+                    topic_urls.append(url)
+        
+        # 3. 如果未读和新帖子不够，从首页补充
+        if len(topic_urls) < 10:
+            logger.info("未读/新帖子较少，从首页补充")
+            home_urls = await self._get_topics_from_page("https://linux.do/")
+            for url in home_urls:
+                if url not in topic_urls:
+                    topic_urls.append(url)
         
         if not topic_urls:
-            logger.error("过滤后没有可浏览的帖子")
+            logger.error("没有可浏览的帖子")
             return 0
         
-        logger.info(f"发现 {len(topic_urls)} 个可浏览帖子，开始按时间浏览（目标 {self.browse_duration} 秒）")
+        logger.info(f"共收集到 {len(topic_urls)} 个帖子，开始按时间浏览（目标 {self.browse_duration} 秒）")
         
-        # 按时间浏览，而不是按数量
+        # 按时间浏览（未读帖子优先，不打乱顺序）
         start_time = time.time()
         browsed_count = 0
-        random.shuffle(topic_urls)  # 打乱顺序
         
         for url in topic_urls:
-            # 检查是否已达到目标时间
             elapsed = time.time() - start_time
             if elapsed >= self.browse_duration:
                 logger.info(f"已达到目标浏览时间 {self.browse_duration} 秒")
@@ -451,6 +438,46 @@ class LinuxDoAdapter(BasePlatformAdapter):
         total_time = time.time() - start_time
         logger.info(f"浏览完成，共浏览 {browsed_count} 个帖子，用时 {total_time:.0f} 秒")
         return browsed_count
+    
+    async def _get_topics_from_page(self, page_url: str) -> list[str]:
+        """从指定页面获取帖子链接列表"""
+        topic_urls = []
+        
+        try:
+            await self.page.goto(page_url, wait_until="domcontentloaded")
+            await asyncio.sleep(random.uniform(1.5, 2.5))
+            
+            topic_rows = await self.page.query_selector_all("#list-area tr")
+            
+            for row in topic_rows:
+                try:
+                    # 检查是否包含屏蔽分类
+                    row_text = await row.inner_text()
+                    should_skip = False
+                    for blocked in self.BLOCKED_CATEGORIES:
+                        if blocked in row_text:
+                            should_skip = True
+                            break
+                    if should_skip:
+                        continue
+                    
+                    # 获取链接
+                    title_link = await row.query_selector(".title")
+                    if not title_link:
+                        continue
+                    
+                    href = await title_link.get_attribute("href")
+                    if href:
+                        if not href.startswith("http"):
+                            href = f"https://linux.do{href}"
+                        topic_urls.append(href)
+                except Exception:
+                    continue
+                    
+        except Exception as e:
+            logger.warning(f"获取 {page_url} 帖子列表失败: {e}")
+        
+        return topic_urls
     
     async def _click_one_topic(self, topic_url: str) -> bool:
         """点击单个主题帖"""
