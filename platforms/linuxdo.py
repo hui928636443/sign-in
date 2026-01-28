@@ -347,23 +347,47 @@ class LinuxDoAdapter(BasePlatformAdapter):
         await password_input.fill(self.password)
         await asyncio.sleep(random.uniform(0.5, 1.0))
         
-        # Step 7: 点击登录按钮
+        # Step 7: 点击登录按钮并等待 /session API 响应
         logger.info("点击登录按钮...")
         login_button = await self.page.query_selector("#login-button")
         if not login_button:
             logger.error("未找到登录按钮")
             return False
         
-        await login_button.click()
-        
-        # Step 8: 等待登录完成（检测用户头像或错误信息）
-        logger.info("等待登录结果...")
+        # 使用 Promise.all 同时等待 API 响应和点击
         try:
-            # 等待登录成功（用户头像出现）或失败（错误信息出现）
-            await self.page.wait_for_selector(
-                "#current-user, .alert-error, .login-error", 
-                timeout=15000
-            )
+            async with self.page.expect_response(
+                lambda resp: "/session" in resp.url and resp.request.method == "POST",
+                timeout=30000
+            ) as response_info:
+                await login_button.click()
+            
+            response = await response_info.value
+            logger.info(f"登录 API 响应: {response.status}")
+            
+            if response.status == 200:
+                try:
+                    resp_json = await response.json()
+                    if resp_json.get("error"):
+                        logger.error(f"登录失败: {resp_json.get('error')}")
+                        return False
+                    logger.info("登录 API 返回成功!")
+                except Exception:
+                    pass
+            elif response.status == 403:
+                logger.error("登录被 Cloudflare 拦截 (403)")
+                return False
+            else:
+                logger.warning(f"登录 API 返回非 200: {response.status}")
+        except Exception as e:
+            logger.warning(f"等待登录响应超时或异常: {e}")
+            # 继续检查页面状态
+        
+        # Step 8: 等待页面更新（用户头像出现）
+        logger.info("等待页面更新...")
+        try:
+            await self.page.wait_for_selector("#current-user", timeout=10000)
+            logger.info("检测到用户头像，登录成功!")
         except Exception:
             # 超时后检查页面状态
             pass
@@ -372,17 +396,22 @@ class LinuxDoAdapter(BasePlatformAdapter):
         
         # Step 9: 检查登录结果
         # 检查是否有错误信息
-        error_ele = await self.page.query_selector(".alert-error, .login-error")
+        error_ele = await self.page.query_selector(".alert-error, .login-error, #modal-alert")
         if error_ele:
             error_text = await error_ele.inner_text()
-            logger.error(f"登录失败: {error_text}")
-            return False
+            if error_text.strip():
+                logger.error(f"登录失败: {error_text}")
+                return False
         
         # 检查是否登录成功
         user_ele = await self.page.query_selector("#current-user")
         if user_ele:
             logger.info("登录成功!")
         else:
+            # 打印当前页面 URL 和部分内容用于调试
+            current_url = self.page.url
+            logger.debug(f"当前页面 URL: {current_url}")
+            
             # 尝试访问首页确认登录状态
             await self.page.goto(HOME_URL, wait_until="domcontentloaded")
             await asyncio.sleep(3)
@@ -390,6 +419,8 @@ class LinuxDoAdapter(BasePlatformAdapter):
             if not user_ele:
                 content = await self.page.content()
                 if "avatar" not in content and "current-user" not in content:
+                    # 打印页面部分内容用于调试
+                    logger.debug(f"页面内容片段: {content[:500]}")
                     logger.error("登录验证失败")
                     return False
             logger.info("登录成功!")
