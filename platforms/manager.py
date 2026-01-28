@@ -116,8 +116,8 @@ class PlatformManager:
         for order, (original_index, account) in enumerate(accounts_with_index):
             logger.info(f"开始执行 LinuxDo 账号 {order + 1}/{total_accounts}: {account.get_display_name(original_index)}")
 
-            # 随机化浏览时长：20-40 分钟（1200-2400秒）
-            randomized_duration = random.randint(1200, 2400)
+            # 随机化浏览时长：50-70 分钟（3000-4200秒）
+            randomized_duration = random.randint(3000, 4200)
             logger.info(f"本次浏览目标时长: {randomized_duration // 60} 分 {randomized_duration % 60} 秒")
 
             adapter = LinuxDoAdapter(
