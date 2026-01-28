@@ -281,12 +281,12 @@ class LinuxDoAdapter(BasePlatformAdapter):
             logger.debug(f"模拟人类行为时出错: {e}")
     
     async def login(self) -> bool:
-        """执行登录操作 - 浏览器过 CF + curl_cffi 登录
+        """执行登录操作 - 纯浏览器表单登录
         
-        策略：
+        策略：完全使用浏览器操作，不依赖 API 请求
         1. 用 Patchright 浏览器访问页面，通过 Cloudflare 验证
-        2. 同步 cf_clearance Cookie 到 curl_cffi session
-        3. 用 curl_cffi (impersonate) 发送登录请求
+        2. 直接在页面上填写用户名密码
+        3. 点击登录按钮，等待登录完成
         """
         # 启动前随机预热延迟（1-5秒），模拟人类打开浏览器的准备时间
         warmup_delay = random.uniform(1.0, 5.0)
@@ -312,8 +312,89 @@ class LinuxDoAdapter(BasePlatformAdapter):
         # Step 3: 模拟人类行为
         await self._simulate_human_behavior()
         
-        # Step 4: 同步浏览器 Cookie 到 curl_cffi session（关键：cf_clearance）
-        logger.info("同步 Cookie 到 curl_cffi...")
+        # Step 4: 等待登录表单加载
+        logger.info("等待登录表单...")
+        try:
+            # Discourse 登录表单的用户名输入框
+            await self.page.wait_for_selector(
+                "#login-account-name", timeout=10000
+            )
+        except Exception as e:
+            logger.error(f"登录表单加载超时: {e}")
+            return False
+        
+        # Step 5: 填写用户名
+        logger.info("填写登录信息...")
+        username_input = await self.page.query_selector("#login-account-name")
+        if not username_input:
+            logger.error("未找到用户名输入框")
+            return False
+        
+        # 模拟人类输入：先点击，再清空，再输入
+        await username_input.click()
+        await asyncio.sleep(random.uniform(0.3, 0.6))
+        await username_input.fill(self.username)
+        await asyncio.sleep(random.uniform(0.5, 1.0))
+        
+        # Step 6: 填写密码
+        password_input = await self.page.query_selector("#login-account-password")
+        if not password_input:
+            logger.error("未找到密码输入框")
+            return False
+        
+        await password_input.click()
+        await asyncio.sleep(random.uniform(0.3, 0.6))
+        await password_input.fill(self.password)
+        await asyncio.sleep(random.uniform(0.5, 1.0))
+        
+        # Step 7: 点击登录按钮
+        logger.info("点击登录按钮...")
+        login_button = await self.page.query_selector("#login-button")
+        if not login_button:
+            logger.error("未找到登录按钮")
+            return False
+        
+        await login_button.click()
+        
+        # Step 8: 等待登录完成（检测用户头像或错误信息）
+        logger.info("等待登录结果...")
+        try:
+            # 等待登录成功（用户头像出现）或失败（错误信息出现）
+            await self.page.wait_for_selector(
+                "#current-user, .alert-error, .login-error", 
+                timeout=15000
+            )
+        except Exception:
+            # 超时后检查页面状态
+            pass
+        
+        await asyncio.sleep(2)
+        
+        # Step 9: 检查登录结果
+        # 检查是否有错误信息
+        error_ele = await self.page.query_selector(".alert-error, .login-error")
+        if error_ele:
+            error_text = await error_ele.inner_text()
+            logger.error(f"登录失败: {error_text}")
+            return False
+        
+        # 检查是否登录成功
+        user_ele = await self.page.query_selector("#current-user")
+        if user_ele:
+            logger.info("登录成功!")
+        else:
+            # 尝试访问首页确认登录状态
+            await self.page.goto(HOME_URL, wait_until="domcontentloaded")
+            await asyncio.sleep(3)
+            user_ele = await self.page.query_selector("#current-user")
+            if not user_ele:
+                content = await self.page.content()
+                if "avatar" not in content and "current-user" not in content:
+                    logger.error("登录验证失败")
+                    return False
+            logger.info("登录成功!")
+        
+        # Step 10: 同步浏览器 Cookie 到 curl_cffi session（用于后续 API 请求）
         browser_cookies = await self.context.cookies()
         for cookie in browser_cookies:
             if "linux.do" in cookie.get("domain", ""):
@@ -323,102 +404,10 @@ class LinuxDoAdapter(BasePlatformAdapter):
                     domain=cookie.get("domain", ".linux.do")
                 )
         
-        # 额外等待确保 Cookie 生效
-        await asyncio.sleep(2)
-        
-        # Step 5: 用 curl_cffi 获取 CSRF Token
-        logger.info("获取 CSRF Token...")
-        headers = {
-            "User-Agent": self._user_agent,
-            "Accept": "application/json, text/javascript, */*; q=0.01",
-            "Accept-Language": "zh-CN,zh;q=0.9",
-            "X-Requested-With": "XMLHttpRequest",
-            "Referer": LOGIN_URL,
-        }
-        
-        try:
-            resp_csrf = self.session.get(
-                CSRF_URL, headers=headers, impersonate="chrome136"
-            )
-            if resp_csrf.status_code != 200:
-                logger.error(f"CSRF 请求失败: {resp_csrf.status_code}")
-                return False
-            csrf_data = resp_csrf.json()
-            csrf_token = csrf_data.get("csrf")
-            if not csrf_token:
-                logger.error("CSRF Token 为空")
-                return False
-            logger.info(f"CSRF Token 获取成功: {csrf_token[:10]}...")
-        except Exception as e:
-            logger.error(f"获取 CSRF Token 失败: {e}")
-            return False
-        
-        # Step 6: 用 curl_cffi 执行登录
-        logger.info("执行登录...")
-        headers.update({
-            "X-CSRF-Token": csrf_token,
-            "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
-            "Origin": "https://linux.do",
-        })
-        
-        data = {
-            "login": self.username,
-            "password": self.password,
-            "second_factor_method": "1",
-            "timezone": "Asia/Shanghai",
-        }
-        
-        try:
-            resp_login = self.session.post(
-                SESSION_URL, data=data, headers=headers, impersonate="chrome136"
-            )
-            
-            if resp_login.status_code != 200:
-                logger.error(f"登录请求失败: {resp_login.status_code}")
-                return False
-            
-            login_data = resp_login.json()
-            if login_data.get("error"):
-                logger.error(f"登录失败: {login_data.get('error')}")
-                return False
-            
-            logger.info("登录成功!")
-        except Exception as e:
-            logger.error(f"登录请求异常: {e}")
-            return False
-        
-        # Step 7: 同步登录后的 Cookie 回浏览器（用于后续浏览帖子）
-        cookies_dict = self.session.cookies.get_dict()
-        for name, value in cookies_dict.items():
-            await self.context.add_cookies([{
-                "name": name,
-                "value": value,
-                "domain": ".linux.do",
-                "path": "/",
-            }])
-        
-        # 刷新页面确保登录状态生效
-        await self.page.goto(HOME_URL, wait_until="domcontentloaded")
-        await asyncio.sleep(3)
-        
         # 获取 Connect 信息
         self._fetch_connect_info()
         
-        # 验证登录状态
-        try:
-            user_ele = await self.page.query_selector("#current-user")
-            if not user_ele:
-                content = await self.page.content()
-                if "avatar" in content or "current-user" in content:
-                    logger.info("登录验证成功 (通过页面内容)")
-                    return True
-                logger.error("登录验证失败 (未找到用户元素)")
-                return False
-            logger.info("登录验证成功")
-            return True
-        except Exception as e:
-            logger.warning(f"登录验证异常: {e}")
-            return True  # 继续执行
+        return True
     
     async def checkin(self) -> CheckinResult:
         """执行签到操作（浏览帖子）"""
