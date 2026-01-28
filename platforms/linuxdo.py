@@ -230,7 +230,9 @@ class LinuxDoAdapter(BasePlatformAdapter):
         })
     
     async def login(self) -> bool:
-        """执行登录操作"""
+        """执行登录操作 - 纯浏览器方式，绕过 Cloudflare"""
+        import json
+        
         # 启动前随机预热延迟（1-5秒），模拟人类打开浏览器的准备时间
         warmup_delay = random.uniform(1.0, 5.0)
         logger.debug(f"预热延迟 {warmup_delay:.1f} 秒...")
@@ -241,92 +243,106 @@ class LinuxDoAdapter(BasePlatformAdapter):
         await self._init_browser()
         self._init_session()
         
-        # Step 1: 获取 CSRF Token
-        logger.info("获取 CSRF token...")
-        headers = {
-            "User-Agent": self._user_agent,
-            "Accept": "application/json, text/javascript, */*; q=0.01",
-            "Accept-Language": "zh-CN,zh;q=0.9",
-            "X-Requested-With": "XMLHttpRequest",
-            "Referer": LOGIN_URL,
-        }
+        # Step 1: 用浏览器访问登录页，通过 Cloudflare 检测
+        logger.info("访问登录页面...")
+        await self.page.goto(LOGIN_URL, wait_until="domcontentloaded")
+        await asyncio.sleep(random.uniform(2.0, 4.0))
         
-        try:
-            resp_csrf = self.session.get(CSRF_URL, headers=headers, impersonate="chrome136")
-            csrf_data = resp_csrf.json()
-            csrf_token = csrf_data.get("csrf")
-            logger.info(f"CSRF Token 获取成功: {csrf_token[:10]}...")
-        except Exception as e:
-            logger.error(f"获取 CSRF Token 失败: {e}")
+        # Step 2: 通过浏览器 JS 获取 CSRF Token 并执行登录
+        logger.info("通过浏览器执行登录...")
+        
+        # 安全转义用户名和密码，防止 JS 注入
+        safe_username = json.dumps(self.username)
+        safe_password = json.dumps(self.password)
+        
+        login_result = await self.page.evaluate(f"""
+            async () => {{
+                try {{
+                    // 获取 CSRF Token
+                    const csrfResp = await fetch('/session/csrf', {{
+                        headers: {{
+                            'Accept': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest'
+                        }}
+                    }});
+                    
+                    if (!csrfResp.ok) {{
+                        return {{ success: false, error: 'CSRF 请求失败: ' + csrfResp.status }};
+                    }}
+                    
+                    const csrfData = await csrfResp.json();
+                    const csrfToken = csrfData.csrf;
+                    
+                    if (!csrfToken) {{
+                        return {{ success: false, error: 'CSRF Token 为空' }};
+                    }}
+                    
+                    // 执行登录
+                    const loginResp = await fetch('/session', {{
+                        method: 'POST',
+                        headers: {{
+                            'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+                            'X-CSRF-Token': csrfToken,
+                            'X-Requested-With': 'XMLHttpRequest'
+                        }},
+                        body: new URLSearchParams({{
+                            'login': {safe_username},
+                            'password': {safe_password},
+                            'second_factor_method': '1',
+                            'timezone': 'Asia/Shanghai'
+                        }})
+                    }});
+                    
+                    if (!loginResp.ok) {{
+                        return {{ success: false, error: '登录请求失败: ' + loginResp.status }};
+                    }}
+                    
+                    const loginData = await loginResp.json();
+                    
+                    if (loginData.error) {{
+                        return {{ success: false, error: loginData.error }};
+                    }}
+                    
+                    return {{ success: true, user: loginData.user || {{}} }};
+                }} catch (e) {{
+                    return {{ success: false, error: e.message }};
+                }}
+            }}
+        """)
+        
+        if not login_result or not login_result.get("success"):
+            error_msg = login_result.get("error", "未知错误") if login_result else "JS 执行失败"
+            logger.error(f"登录失败: {error_msg}")
             return False
         
-        # Step 2: 登录
-        logger.info("正在登录...")
-        headers.update({
-            "X-CSRF-Token": csrf_token,
-            "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
-            "Origin": "https://linux.do",
-        })
+        logger.info("登录成功!")
         
-        data = {
-            "login": self.username,
-            "password": self.password,
-            "second_factor_method": "1",
-            "timezone": "Asia/Shanghai",
-        }
+        # Step 3: 同步浏览器 Cookie 到 curl_cffi session（用于后续 API 请求）
+        browser_cookies = await self.context.cookies()
+        for cookie in browser_cookies:
+            if "linux.do" in cookie.get("domain", ""):
+                self.session.cookies.set(
+                    cookie["name"], 
+                    cookie["value"], 
+                    domain=cookie.get("domain", ".linux.do")
+                )
         
-        try:
-            resp_login = self.session.post(
-                SESSION_URL, data=data, impersonate="chrome136", headers=headers
-            )
-            
-            if resp_login.status_code == 200:
-                response_json = resp_login.json()
-                if response_json.get("error"):
-                    logger.error(f"登录失败: {response_json.get('error')}")
-                    return False
-                logger.info("登录成功!")
-            else:
-                logger.error(f"登录失败，状态码: {resp_login.status_code}")
-                return False
-        except Exception as e:
-            logger.error(f"登录请求异常: {e}")
-            return False
+        # 刷新页面确保登录状态生效
+        await self.page.goto(HOME_URL, wait_until="domcontentloaded")
+        await asyncio.sleep(3)
         
         # 获取 Connect 信息
         self._fetch_connect_info()
-        
-        # Step 3: 同步 Cookie 到 Patchright
-        logger.info("同步 Cookie 到 Patchright...")
-        cookies_dict = self.session.cookies.get_dict()
-        
-        cookies_list = [
-            {
-                "name": name,
-                "value": value,
-                "domain": ".linux.do",
-                "path": "/",
-            }
-            for name, value in cookies_dict.items()
-        ]
-        
-        await self.context.add_cookies(cookies_list)
-        
-        logger.info("Cookie 设置完成，导航至 linux.do...")
-        await self.page.goto(HOME_URL, wait_until="domcontentloaded")
-        
-        # 等待页面加载
-        await asyncio.sleep(5)
         
         # 验证登录状态
         try:
             user_ele = await self.page.query_selector("#current-user")
             if not user_ele:
                 content = await self.page.content()
-                if "avatar" in content:
-                    logger.info("登录验证成功 (通过 avatar)")
+                if "avatar" in content or "current-user" in content:
+                    logger.info("登录验证成功 (通过页面内容)")
                     return True
-                logger.error("登录验证失败 (未找到 current-user)")
+                logger.error("登录验证失败 (未找到用户元素)")
                 return False
             logger.info("登录验证成功")
             return True
