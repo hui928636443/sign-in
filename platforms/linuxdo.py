@@ -229,6 +229,57 @@ class LinuxDoAdapter(BasePlatformAdapter):
             "Accept-Language": "zh-CN,zh;q=0.9",
         })
     
+    async def _wait_for_cloudflare(self, timeout: int = 30) -> bool:
+        """等待 Cloudflare 挑战完成
+        
+        通过检测 cf_clearance Cookie 或页面特定元素来判断验证是否通过
+        
+        Args:
+            timeout: 最大等待时间（秒）
+            
+        Returns:
+            是否通过验证
+        """
+        for i in range(timeout):
+            # 检查是否有 cf_clearance Cookie
+            cookies = await self.context.cookies()
+            has_clearance = any(c["name"] == "cf_clearance" for c in cookies)
+            
+            # 检查页面是否有登录表单（说明已通过 Cloudflare）
+            login_form = await self.page.query_selector("#login-form, .login-modal, #login-account-name")
+            
+            if has_clearance or login_form:
+                logger.info(f"Cloudflare 验证通过 (耗时 {i+1} 秒)")
+                return True
+            
+            # 检查是否还在 Cloudflare 挑战页面
+            challenge_frame = await self.page.query_selector("iframe[src*='challenges.cloudflare.com']")
+            if challenge_frame:
+                logger.debug(f"检测到 Cloudflare 挑战，等待中... ({i+1}/{timeout})")
+            
+            await asyncio.sleep(1)
+        
+        return False
+    
+    async def _simulate_human_behavior(self) -> None:
+        """模拟人类行为，帮助通过 Cloudflare 检测"""
+        try:
+            # 随机移动鼠标
+            for _ in range(random.randint(2, 4)):
+                x = random.randint(100, 800)
+                y = random.randint(100, 600)
+                await self.page.mouse.move(x, y)
+                await asyncio.sleep(random.uniform(0.1, 0.3))
+            
+            # 随机滚动
+            await self.page.mouse.wheel(0, random.randint(100, 300))
+            await asyncio.sleep(random.uniform(0.5, 1.0))
+            
+            # 额外等待，让页面 JS 完全执行
+            await asyncio.sleep(random.uniform(1.0, 2.0))
+        except Exception as e:
+            logger.debug(f"模拟人类行为时出错: {e}")
+    
     async def login(self) -> bool:
         """执行登录操作 - 纯浏览器方式，绕过 Cloudflare"""
         import json
@@ -246,9 +297,18 @@ class LinuxDoAdapter(BasePlatformAdapter):
         # Step 1: 用浏览器访问登录页，通过 Cloudflare 检测
         logger.info("访问登录页面...")
         await self.page.goto(LOGIN_URL, wait_until="domcontentloaded")
-        await asyncio.sleep(random.uniform(2.0, 4.0))
         
-        # Step 2: 通过浏览器 JS 获取 CSRF Token 并执行登录
+        # Step 2: 等待 Cloudflare 挑战完成
+        logger.info("等待 Cloudflare 验证...")
+        cf_passed = await self._wait_for_cloudflare()
+        if not cf_passed:
+            logger.error("Cloudflare 验证超时")
+            return False
+        
+        # Step 3: 模拟人类行为，随机移动鼠标和滚动
+        await self._simulate_human_behavior()
+        
+        # Step 4: 通过浏览器 JS 获取 CSRF Token 并执行登录
         logger.info("通过浏览器执行登录...")
         
         # 安全转义用户名和密码，防止 JS 注入
