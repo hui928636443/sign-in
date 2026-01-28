@@ -323,44 +323,52 @@ class LinuxDoAdapter(BasePlatformAdapter):
             logger.error(f"登录表单加载超时: {e}")
             return False
         
-        # Step 5: 填写用户名
+        # Step 5: 填写用户名 - 使用 pressSequentially 模拟真实键盘输入
         logger.info("填写登录信息...")
-        username_input = await self.page.query_selector("#login-account-name")
-        if not username_input:
-            logger.error("未找到用户名输入框")
-            return False
         
-        # 模拟人类输入：先点击，再清空，再输入
-        await username_input.click()
+        # 使用 locator API（更稳定）
+        username_locator = self.page.locator("#login-account-name")
+        password_locator = self.page.locator("#login-account-password")
+        
+        # 等待输入框可见并可交互
+        await username_locator.wait_for(state="visible", timeout=10000)
+        
+        # 先点击聚焦，触发浏览器的 focus 状态
+        await username_locator.click()
         await asyncio.sleep(random.uniform(0.3, 0.6))
-        await username_input.fill(self.username)
+        
+        # 使用 pressSequentially 模拟真实键盘输入（随机延迟）
+        # Discourse 会检测输入速率，太快会被拦截
+        for char in self.username:
+            await self.page.keyboard.type(char, delay=random.randint(50, 150))
+            # 偶尔停顿一下，模拟思考
+            if random.random() < 0.1:
+                await asyncio.sleep(random.uniform(0.1, 0.3))
+        
         await asyncio.sleep(random.uniform(0.5, 1.0))
         
-        # Step 6: 填写密码
-        password_input = await self.page.query_selector("#login-account-password")
-        if not password_input:
-            logger.error("未找到密码输入框")
-            return False
-        
-        await password_input.click()
+        # Step 6: 填写密码 - 同样使用模拟键盘输入
+        await password_locator.click()
         await asyncio.sleep(random.uniform(0.3, 0.6))
-        await password_input.fill(self.password)
-        await asyncio.sleep(random.uniform(0.5, 1.0))
         
-        # Step 7: 点击登录按钮并等待 /session API 响应
-        logger.info("点击登录按钮...")
-        login_button = await self.page.query_selector("#login-button")
-        if not login_button:
-            logger.error("未找到登录按钮")
-            return False
+        for char in self.password:
+            await self.page.keyboard.type(char, delay=random.randint(50, 150))
+            if random.random() < 0.1:
+                await asyncio.sleep(random.uniform(0.1, 0.3))
         
-        # 使用 Promise.all 同时等待 API 响应和点击
+        await asyncio.sleep(random.uniform(0.8, 1.5))
+        
+        # Step 7: 按 Enter 键提交（比点击按钮更可靠）
+        # Discourse 的登录按钮可能有 Hydration 延迟，直接按 Enter 更稳定
+        logger.info("提交登录...")
+        
         try:
             async with self.page.expect_response(
                 lambda resp: "/session" in resp.url and resp.request.method == "POST",
                 timeout=30000
             ) as response_info:
-                await login_button.click()
+                # 按 Enter 键提交表单
+                await self.page.keyboard.press("Enter")
             
             response = await response_info.value
             logger.info(f"登录 API 响应: {response.status}")
