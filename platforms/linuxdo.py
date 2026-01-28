@@ -534,17 +534,29 @@ class LinuxDoAdapter(BasePlatformAdapter):
             top_5 = topics_with_info[:5]
             logger.info(f"楼层数最多的帖子: {[(t['title'], t['posts']) for t in top_5]}")
         
-        # 6. 按时间浏览
+        # 6. 按时间浏览（循环浏览直到达到目标时长）
         start_time = time.time()
         browsed_count = 0
         total_posts_read = 0
+        topic_index = 0
         
-        for topic in topics_with_info:
+        while True:
             elapsed = time.time() - start_time
             if elapsed >= self.browse_duration:
                 logger.info(f"已达到目标浏览时间 {self.browse_duration} 秒")
                 break
             
+            # 如果帖子列表遍历完了，从头开始（循环浏览）
+            if topic_index >= len(topics_with_info):
+                if browsed_count == 0:
+                    logger.warning("没有成功浏览任何帖子")
+                    break
+                logger.info("帖子列表已遍历完，从头开始循环浏览...")
+                topic_index = 0
+                # 重新打乱顺序，避免重复模式
+                random.shuffle(topics_with_info)
+            
+            topic = topics_with_info[topic_index]
             remaining = self.browse_duration - elapsed
             logger.info(f"浏览第 {browsed_count + 1} 个帖子 ({topic['posts']}楼)，已用时 {elapsed:.0f}s，剩余 {remaining:.0f}s")
             
@@ -552,6 +564,7 @@ class LinuxDoAdapter(BasePlatformAdapter):
             if success:
                 total_posts_read += topic["posts"]
             browsed_count += 1
+            topic_index += 1
             
             # 帖子之间短暂间隔
             await asyncio.sleep(random.uniform(0.5, 1.5))
@@ -604,10 +617,10 @@ class LinuxDoAdapter(BasePlatformAdapter):
         """点击单个主题帖，模拟真实阅读行为标记楼层为已读
         
         策略（避免 403 检测）：
-        1. 打开页面，等待加载
+        1. 打开页面，等待 SPA 内容完全加载
         2. 分批滚动浏览，每次滚动后发送当前可见楼层的 timings
         3. 每批之间添加随机延迟，模拟真实阅读
-        4. 限制每个帖子最多阅读 50 楼（避免超长帖子耗时过久）
+        4. 限制每个帖子最多阅读的楼层数（根据等级配置）
         """
         topic_id = self._extract_topic_id(topic_url)
         if not topic_id:
@@ -616,13 +629,22 @@ class LinuxDoAdapter(BasePlatformAdapter):
         
         new_page = await self.context.new_page()
         try:
-            # 1. 打开页面
+            # 1. 打开页面，等待 SPA 内容加载
             await new_page.goto(topic_url, wait_until="domcontentloaded")
-            await asyncio.sleep(random.uniform(1.0, 2.0))
+            
+            # 等待 Discourse SPA 内容加载完成（等待帖子元素出现）
+            try:
+                await new_page.wait_for_selector(".topic-post", timeout=10000)
+            except Exception:
+                # 如果超时，可能是页面加载慢，继续尝试
+                logger.debug(f"等待帖子元素超时，继续尝试...")
+            
+            # 额外等待确保 Ember.js 渲染完成
+            await asyncio.sleep(random.uniform(1.5, 3.0))
             
             # 获取帖子标题
             title = await new_page.evaluate("document.title") or ""
-            title = title.replace(" - LinuxDo", "")[:30]
+            title = title.replace(" - LinuxDo", "").replace(" - LINUX DO", "")[:30]
             
             # 2. 分批滚动并发送 timings
             posts_read = await self._scroll_and_read(new_page, topic_id, title)
@@ -669,7 +691,12 @@ class LinuxDoAdapter(BasePlatformAdapter):
                 const posts = document.querySelectorAll('.topic-post');
                 return posts.length;
             }
-        """) or 1
+        """) or 0
+        
+        # 如果页面没有加载出帖子，跳过
+        if total_posts == 0:
+            logger.warning(f"帖子「{title}...」未加载出内容，跳过")
+            return 0
         
         level_names = {1: "激进", 2: "中等", 3: "保守"}
         logger.info(f"帖子「{title}...」共 {total_posts} 楼，等级{self.level}({level_names[self.level]})，每批 {batch_size} 楼")
@@ -778,11 +805,14 @@ class LinuxDoAdapter(BasePlatformAdapter):
             if result and result.get("success"):
                 return True
             else:
-                logger.debug(f"timings 批次失败: {result}")
+                # 使用 warning 级别日志，方便排查问题
+                error_info = result.get("error", "unknown") if result else "no result"
+                status = result.get("status", "N/A") if result else "N/A"
+                logger.warning(f"timings 批次失败: status={status}, error={error_info}")
                 return False
                 
         except Exception as e:
-            logger.debug(f"发送 timings 批次异常: {e}")
+            logger.warning(f"发送 timings 批次异常: {e}")
             return False
 
     def _extract_topic_id(self, url: str) -> Optional[int]:

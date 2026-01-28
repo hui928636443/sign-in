@@ -258,6 +258,9 @@ class AppConfig:
                     
                     if accounts:
                         logger.info(f"成功加载 {len(accounts)} 个 LinuxDo 账号配置 (JSON 格式)")
+                        # 显示每个账号的 level 配置，方便调试
+                        for acc in accounts:
+                            logger.debug(f"  - {acc.name}: level={acc.level}")
                         return accounts
             except json.JSONDecodeError as e:
                 logger.error(f"LINUXDO_ACCOUNTS JSON 解析失败: {e}")
