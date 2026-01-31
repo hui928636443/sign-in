@@ -34,6 +34,37 @@ from .logging import (
     SensitiveFilter,
 )
 
+# Import OAuth helpers module
+from .oauth_helpers import (
+    # Enums
+    OAuthURLType,
+    OAuthStep,
+    # URL classification functions
+    classify_oauth_url,
+    is_linuxdo_login_url,
+    is_authorization_url,
+    is_oauth_complete_url,
+    is_oauth_related_url,
+    # Retry utilities
+    async_retry,
+    retry_async_operation,
+    # Exception classes
+    OAuthError,
+    NavigationTimeoutError,
+    ElementNotFoundError,
+    CookieNotFoundError,
+    # Screenshot capture utilities
+    capture_error_screenshot,
+    get_debug_directory,
+    cleanup_old_screenshots,
+    DEFAULT_DEBUG_DIR,
+)
+
+# Import browser module
+from .browser import (
+    BrowserStartupError,
+)
+
 __all__ = [
     # Config
     "AppConfig",
@@ -56,4 +87,28 @@ __all__ = [
     "mask_sensitive_data",
     "get_logger",
     "SensitiveFilter",
+    # OAuth helpers - Enums
+    "OAuthURLType",
+    "OAuthStep",
+    # OAuth helpers - URL classification
+    "classify_oauth_url",
+    "is_linuxdo_login_url",
+    "is_authorization_url",
+    "is_oauth_complete_url",
+    "is_oauth_related_url",
+    # OAuth helpers - Retry utilities
+    "async_retry",
+    "retry_async_operation",
+    # OAuth helpers - Exception classes
+    "OAuthError",
+    "NavigationTimeoutError",
+    "ElementNotFoundError",
+    "CookieNotFoundError",
+    # OAuth helpers - Screenshot capture utilities
+    "capture_error_screenshot",
+    "get_debug_directory",
+    "cleanup_old_screenshots",
+    "DEFAULT_DEBUG_DIR",
+    # Browser - Exception classes
+    "BrowserStartupError",
 ]

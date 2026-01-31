@@ -10,12 +10,31 @@ Requirements:
 """
 
 import json
+import ssl
 import tempfile
 from typing import Optional
 
 import httpx
 from loguru import logger
 from patchright.async_api import async_playwright
+
+
+def _create_ssl_context() -> ssl.SSLContext:
+    """创建兼容旧服务器的 SSL 上下文
+    
+    AnyRouter 服务器可能使用较旧的 SSL 配置或 CDN，
+    Python 3.10+ 默认禁用了某些旧加密算法，需要手动启用。
+    同时禁用主机名验证以兼容 CDN 场景。
+    """
+    ctx = ssl.create_default_context()
+    # 允许 OpenSSL 默认的所有算法，包括旧算法
+    ctx.set_ciphers('DEFAULT')
+    # 开启 OP_LEGACY_SERVER_CONNECT 以支持旧版服务器
+    ctx.options |= 0x4  # ssl.OP_LEGACY_SERVER_CONNECT
+    # 禁用主机名验证（AnyRouter 使用 CDN，证书可能不匹配）
+    ctx.check_hostname = False
+    ctx.verify_mode = ssl.CERT_NONE
+    return ctx
 
 from platforms.base import BasePlatformAdapter, CheckinResult, CheckinStatus
 from utils.config import AnyRouterAccount, ProviderConfig
@@ -79,8 +98,9 @@ class AnyRouterAdapter(BasePlatformAdapter):
         # 合并 cookies
         all_cookies = {**self.waf_cookies, **user_cookies}
         
-        # 初始化 HTTP 客户端
-        self.client = httpx.Client(http2=True, timeout=30.0)
+        # 初始化 HTTP 客户端（使用兼容旧服务器的 SSL 配置）
+        ssl_ctx = _create_ssl_context()
+        self.client = httpx.Client(http2=True, timeout=30.0, verify=ssl_ctx)
         self.client.cookies.update(all_cookies)
         
         return True

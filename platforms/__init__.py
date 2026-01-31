@@ -9,8 +9,10 @@ from platforms.anyrouter import AnyRouterAdapter
 from platforms.duckcoding import DuckCodingAdapter
 from platforms.elysiver import ElysiverAdapter
 from platforms.kfcapi import KFCAPIAdapter
+from platforms.linuxdo import LinuxDOAdapter
 from platforms.neb import NEBAdapter
 from platforms.runanytime import RunAnytimeAdapter
+from platforms.wong import WongAdapter
 from platforms.manager import PlatformManager
 
 __all__ = [
@@ -21,7 +23,9 @@ __all__ = [
     "DuckCodingAdapter",
     "ElysiverAdapter",
     "KFCAPIAdapter",
+    "LinuxDOAdapter",
     "NEBAdapter",
     "RunAnytimeAdapter",
+    "WongAdapter",
     "PlatformManager",
 ]

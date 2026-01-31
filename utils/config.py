@@ -15,7 +15,7 @@ Requirements:
 import json
 import os
 from dataclasses import dataclass, field
-from typing import Dict, List, Literal, Optional
+from typing import Literal
 
 from loguru import logger
 
@@ -23,22 +23,22 @@ from loguru import logger
 @dataclass
 class AnyRouterAccount:
     """AnyRouter 账号配置"""
-    
+
     cookies: dict | str
     api_user: str
     provider: str = "anyrouter"
-    name: Optional[str] = None
-    
+    name: str | None = None
+
     @classmethod
     def from_dict(cls, data: dict, index: int) -> "AnyRouterAccount":
         """从字典创建 AnyRouterAccount"""
         provider = data.get("provider", "anyrouter")
         name = data.get("name") or f"Account {index + 1}"
         return cls(cookies=data["cookies"], api_user=data["api_user"], provider=provider, name=name)
-    
+
     def get_display_name(self, index: int) -> str:
         return self.name if self.name else f"Account {index + 1}"
-    
+
     def to_dict(self) -> dict:
         result = {"cookies": self.cookies, "api_user": self.api_user, "provider": self.provider}
         if self.name:
@@ -49,18 +49,18 @@ class AnyRouterAccount:
 @dataclass
 class WongAccount:
     """WONG 公益站账号配置
-    
+
     支持两种登录方式：
     1. LinuxDO OAuth（优先）
     2. Cookie 回退
     """
-    
-    linuxdo_username: Optional[str] = None
-    linuxdo_password: Optional[str] = None
-    fallback_cookies: Optional[str] = None
-    api_user: Optional[str] = None
-    name: Optional[str] = None
-    
+
+    linuxdo_username: str | None = None
+    linuxdo_password: str | None = None
+    fallback_cookies: str | None = None
+    api_user: str | None = None
+    name: str | None = None
+
     @classmethod
     def from_dict(cls, data: dict, index: int) -> "WongAccount":
         """从字典创建 WongAccount"""
@@ -72,7 +72,7 @@ class WongAccount:
             api_user=data.get("api_user"),
             name=name,
         )
-    
+
     def get_display_name(self, index: int) -> str:
         if self.name:
             return self.name
@@ -84,18 +84,18 @@ class WongAccount:
 @dataclass
 class ElysiverAccount:
     """Elysiver 账号配置
-    
+
     支持两种登录方式：
     1. LinuxDO OAuth（优先）
     2. Cookie 回退
     """
-    
-    linuxdo_username: Optional[str] = None
-    linuxdo_password: Optional[str] = None
-    fallback_cookies: Optional[str] = None
-    api_user: Optional[str] = None
-    name: Optional[str] = None
-    
+
+    linuxdo_username: str | None = None
+    linuxdo_password: str | None = None
+    fallback_cookies: str | None = None
+    api_user: str | None = None
+    name: str | None = None
+
     @classmethod
     def from_dict(cls, data: dict, index: int) -> "ElysiverAccount":
         """从字典创建 ElysiverAccount"""
@@ -107,7 +107,7 @@ class ElysiverAccount:
             api_user=data.get("api_user"),
             name=name,
         )
-    
+
     def get_display_name(self, index: int) -> str:
         if self.name:
             return self.name
@@ -119,18 +119,18 @@ class ElysiverAccount:
 @dataclass
 class KFCAPIAccount:
     """KFC API 账号配置
-    
+
     支持两种登录方式：
     1. LinuxDO OAuth（优先）
     2. Cookie 回退
     """
-    
-    linuxdo_username: Optional[str] = None
-    linuxdo_password: Optional[str] = None
-    fallback_cookies: Optional[str] = None
-    api_user: Optional[str] = None
-    name: Optional[str] = None
-    
+
+    linuxdo_username: str | None = None
+    linuxdo_password: str | None = None
+    fallback_cookies: str | None = None
+    api_user: str | None = None
+    name: str | None = None
+
     @classmethod
     def from_dict(cls, data: dict, index: int) -> "KFCAPIAccount":
         """从字典创建 KFCAPIAccount"""
@@ -142,7 +142,7 @@ class KFCAPIAccount:
             api_user=data.get("api_user"),
             name=name,
         )
-    
+
     def get_display_name(self, index: int) -> str:
         if self.name:
             return self.name
@@ -154,18 +154,18 @@ class KFCAPIAccount:
 @dataclass
 class DuckCodingAccount:
     """Free DuckCoding 账号配置
-    
+
     支持两种登录方式：
     1. LinuxDO OAuth（优先）
     2. Cookie 回退
     """
-    
-    linuxdo_username: Optional[str] = None
-    linuxdo_password: Optional[str] = None
-    fallback_cookies: Optional[str] = None
-    api_user: Optional[str] = None
-    name: Optional[str] = None
-    
+
+    linuxdo_username: str | None = None
+    linuxdo_password: str | None = None
+    fallback_cookies: str | None = None
+    api_user: str | None = None
+    name: str | None = None
+
     @classmethod
     def from_dict(cls, data: dict, index: int) -> "DuckCodingAccount":
         """从字典创建 DuckCodingAccount"""
@@ -177,7 +177,7 @@ class DuckCodingAccount:
             api_user=data.get("api_user"),
             name=name,
         )
-    
+
     def get_display_name(self, index: int) -> str:
         if self.name:
             return self.name
@@ -278,28 +278,34 @@ NEWAPI_SITES = {
 @dataclass
 class LinuxDOAccount:
     """LinuxDO 统一账号配置
-    
+
     一个 LinuxDO 账号可以签到多个支持 LinuxDO OAuth 的站点。
     """
-    
+
     username: str
     password: str
-    sites: List[str] = field(default_factory=lambda: list(NEWAPI_SITES.keys()))
-    name: Optional[str] = None
-    
+    sites: list[str] = field(default_factory=lambda: list(NEWAPI_SITES.keys()))
+    browse_linuxdo: bool = True  # 是否浏览 LinuxDO 帖子
+    browse_count: int = 10  # 浏览帖子数量
+    name: str | None = None
+
     @classmethod
     def from_dict(cls, data: dict, index: int) -> "LinuxDOAccount":
         """从字典创建 LinuxDOAccount"""
         name = data.get("name") or data.get("username") or f"LinuxDO Account {index + 1}"
         # 默认签到所有站点
         sites = data.get("sites", list(NEWAPI_SITES.keys()))
+        browse_linuxdo = data.get("browse_linuxdo", True)
+        browse_count = data.get("browse_count", 10)
         return cls(
             username=data["username"],
             password=data["password"],
             sites=sites,
+            browse_linuxdo=browse_linuxdo,
+            browse_count=browse_count,
             name=name,
         )
-    
+
     def get_display_name(self, index: int) -> str:
         if self.name:
             return self.name
@@ -313,11 +319,11 @@ class ProviderConfig:
     name: str
     domain: str
     login_path: str = "/login"
-    sign_in_path: Optional[str] = "/api/user/sign_in"
+    sign_in_path: str | None = "/api/user/sign_in"
     user_info_path: str = "/api/user/self"
     api_user_key: str = "new-api-user"
-    bypass_method: Optional[Literal["waf_cookies"]] = None
-    waf_cookie_names: Optional[List[str]] = None
+    bypass_method: Literal["waf_cookies"] | None = None
+    waf_cookie_names: list[str] | None = None
 
     def __post_init__(self):
         required_waf_cookies = set()
@@ -326,7 +332,7 @@ class ProviderConfig:
                 name = "" if not item or not isinstance(item, str) else item.strip()
                 if name:
                     required_waf_cookies.add(name)
-        
+
         if not required_waf_cookies:
             self.bypass_method = None
         self.waf_cookie_names = list(required_waf_cookies) if required_waf_cookies else None
@@ -343,7 +349,7 @@ class ProviderConfig:
             bypass_method=data.get("bypass_method"),
             waf_cookie_names=data.get("waf_cookie_names"),
         )
-    
+
     def to_dict(self) -> dict:
         result = {"name": self.name, "domain": self.domain, "login_path": self.login_path}
         if self.sign_in_path:
@@ -359,7 +365,7 @@ class ProviderConfig:
 
     def needs_manual_check_in(self) -> bool:
         """判断是否需要手动调用签到 API
-        
+
         如果配置了 sign_in_path，则需要手动签到
         """
         return self.sign_in_path is not None
@@ -369,13 +375,13 @@ class ProviderConfig:
 class AppConfig:
     """应用配置 - 统一管理所有平台配置"""
 
-    anyrouter_accounts: List[AnyRouterAccount] = field(default_factory=list)
-    wong_accounts: List[WongAccount] = field(default_factory=list)
-    elysiver_accounts: List[ElysiverAccount] = field(default_factory=list)
-    kfcapi_accounts: List[KFCAPIAccount] = field(default_factory=list)
-    duckcoding_accounts: List[DuckCodingAccount] = field(default_factory=list)
-    linuxdo_accounts: List[LinuxDOAccount] = field(default_factory=list)
-    providers: Dict[str, ProviderConfig] = field(default_factory=dict)
+    anyrouter_accounts: list[AnyRouterAccount] = field(default_factory=list)
+    wong_accounts: list[WongAccount] = field(default_factory=list)
+    elysiver_accounts: list[ElysiverAccount] = field(default_factory=list)
+    kfcapi_accounts: list[KFCAPIAccount] = field(default_factory=list)
+    duckcoding_accounts: list[DuckCodingAccount] = field(default_factory=list)
+    linuxdo_accounts: list[LinuxDOAccount] = field(default_factory=list)
+    providers: dict[str, ProviderConfig] = field(default_factory=dict)
 
     @classmethod
     def load_from_env(cls) -> "AppConfig":
@@ -396,18 +402,18 @@ class AppConfig:
             linuxdo_accounts=linuxdo_accounts,
             providers=providers,
         )
-    
+
     @classmethod
-    def _load_wong_accounts(cls) -> List[WongAccount]:
+    def _load_wong_accounts(cls) -> list[WongAccount]:
         """从环境变量加载 WONG 公益站账号配置"""
         accounts = []
-        
+
         # 从 WONG_ACCOUNTS 环境变量加载
         accounts_str = os.getenv("WONG_ACCOUNTS")
         if accounts_str:
             try:
                 accounts_data = json.loads(accounts_str)
-                
+
                 if not isinstance(accounts_data, list):
                     logger.error("WONG_ACCOUNTS 配置格式错误: 必须是 JSON 数组格式")
                 else:
@@ -415,9 +421,9 @@ class AppConfig:
                         if not isinstance(account_dict, dict):
                             logger.error(f"WONG 账号 {i + 1} 配置格式错误: 必须是 JSON 对象")
                             continue
-                        
+
                         accounts.append(WongAccount.from_dict(account_dict, i))
-                    
+
                     if accounts:
                         logger.info(f"成功加载 {len(accounts)} 个 WONG 账号配置 (JSON 格式)")
                         return accounts
@@ -425,20 +431,20 @@ class AppConfig:
                 logger.error(f"WONG_ACCOUNTS JSON 解析失败: {e}")
             except Exception as e:
                 logger.error(f"加载 WONG_ACCOUNTS 时发生错误: {e}")
-        
+
         return accounts
-    
+
     @classmethod
-    def _load_elysiver_accounts(cls) -> List[ElysiverAccount]:
+    def _load_elysiver_accounts(cls) -> list[ElysiverAccount]:
         """从环境变量加载 Elysiver 账号配置"""
         accounts = []
-        
+
         # 从 ELYSIVER_ACCOUNTS 环境变量加载
         accounts_str = os.getenv("ELYSIVER_ACCOUNTS")
         if accounts_str:
             try:
                 accounts_data = json.loads(accounts_str)
-                
+
                 if not isinstance(accounts_data, list):
                     logger.error("ELYSIVER_ACCOUNTS 配置格式错误: 必须是 JSON 数组格式")
                 else:
@@ -446,9 +452,9 @@ class AppConfig:
                         if not isinstance(account_dict, dict):
                             logger.error(f"Elysiver 账号 {i + 1} 配置格式错误: 必须是 JSON 对象")
                             continue
-                        
+
                         accounts.append(ElysiverAccount.from_dict(account_dict, i))
-                    
+
                     if accounts:
                         logger.info(f"成功加载 {len(accounts)} 个 Elysiver 账号配置 (JSON 格式)")
                         return accounts
@@ -456,20 +462,20 @@ class AppConfig:
                 logger.error(f"ELYSIVER_ACCOUNTS JSON 解析失败: {e}")
             except Exception as e:
                 logger.error(f"加载 ELYSIVER_ACCOUNTS 时发生错误: {e}")
-        
+
         return accounts
-    
+
     @classmethod
-    def _load_kfcapi_accounts(cls) -> List[KFCAPIAccount]:
+    def _load_kfcapi_accounts(cls) -> list[KFCAPIAccount]:
         """从环境变量加载 KFC API 账号配置"""
         accounts = []
-        
+
         # 从 KFCAPI_ACCOUNTS 环境变量加载
         accounts_str = os.getenv("KFCAPI_ACCOUNTS")
         if accounts_str:
             try:
                 accounts_data = json.loads(accounts_str)
-                
+
                 if not isinstance(accounts_data, list):
                     logger.error("KFCAPI_ACCOUNTS 配置格式错误: 必须是 JSON 数组格式")
                 else:
@@ -477,9 +483,9 @@ class AppConfig:
                         if not isinstance(account_dict, dict):
                             logger.error(f"KFC API 账号 {i + 1} 配置格式错误: 必须是 JSON 对象")
                             continue
-                        
+
                         accounts.append(KFCAPIAccount.from_dict(account_dict, i))
-                    
+
                     if accounts:
                         logger.info(f"成功加载 {len(accounts)} 个 KFC API 账号配置 (JSON 格式)")
                         return accounts
@@ -487,19 +493,19 @@ class AppConfig:
                 logger.error(f"KFCAPI_ACCOUNTS JSON 解析失败: {e}")
             except Exception as e:
                 logger.error(f"加载 KFCAPI_ACCOUNTS 时发生错误: {e}")
-        
+
         return accounts
-    
+
     @classmethod
-    def _load_duckcoding_accounts(cls) -> List[DuckCodingAccount]:
+    def _load_duckcoding_accounts(cls) -> list[DuckCodingAccount]:
         """从环境变量加载 Free DuckCoding 账号配置"""
         accounts = []
-        
+
         accounts_str = os.getenv("DUCKCODING_ACCOUNTS")
         if accounts_str:
             try:
                 accounts_data = json.loads(accounts_str)
-                
+
                 if not isinstance(accounts_data, list):
                     logger.error("DUCKCODING_ACCOUNTS 配置格式错误: 必须是 JSON 数组格式")
                 else:
@@ -507,9 +513,9 @@ class AppConfig:
                         if not isinstance(account_dict, dict):
                             logger.error(f"DuckCoding 账号 {i + 1} 配置格式错误: 必须是 JSON 对象")
                             continue
-                        
+
                         accounts.append(DuckCodingAccount.from_dict(account_dict, i))
-                    
+
                     if accounts:
                         logger.info(f"成功加载 {len(accounts)} 个 DuckCoding 账号配置 (JSON 格式)")
                         return accounts
@@ -517,25 +523,34 @@ class AppConfig:
                 logger.error(f"DUCKCODING_ACCOUNTS JSON 解析失败: {e}")
             except Exception as e:
                 logger.error(f"加载 DUCKCODING_ACCOUNTS 时发生错误: {e}")
-        
+
         return accounts
-    
+
     @classmethod
-    def _load_linuxdo_accounts(cls) -> List[LinuxDOAccount]:
+    def _load_linuxdo_accounts(cls) -> list[LinuxDOAccount]:
         """从环境变量加载 LinuxDO 统一账号配置
-        
+
         支持两种格式：
         1. LINUXDO_ACCOUNTS: JSON 数组格式，支持多账号和站点选择
         2. LINUXDO_USERNAME + LINUXDO_PASSWORD: 简单格式，单账号签到所有站点
+
+        配置示例:
+        {
+            "username": "your_username",
+            "password": "your_password",
+            "sites": ["wong", "elysiver"],  // 可选，默认所有站点
+            "browse_linuxdo": true,          // 可选，是否浏览帖子
+            "browse_count": 10               // 可选，浏览帖子数量
+        }
         """
         accounts = []
-        
+
         # 方式1: JSON 数组格式
         accounts_str = os.getenv("LINUXDO_ACCOUNTS")
         if accounts_str:
             try:
                 accounts_data = json.loads(accounts_str)
-                
+
                 if not isinstance(accounts_data, list):
                     logger.error("LINUXDO_ACCOUNTS 配置格式错误: 必须是 JSON 数组格式")
                 else:
@@ -543,13 +558,13 @@ class AppConfig:
                         if not isinstance(account_dict, dict):
                             logger.error(f"LinuxDO 账号 {i + 1} 配置格式错误: 必须是 JSON 对象")
                             continue
-                        
+
                         if "username" not in account_dict or "password" not in account_dict:
                             logger.error(f"LinuxDO 账号 {i + 1} 缺少必填字段: 需要 'username' 和 'password'")
                             continue
-                        
+
                         accounts.append(LinuxDOAccount.from_dict(account_dict, i))
-                    
+
                     if accounts:
                         logger.info(f"成功加载 {len(accounts)} 个 LinuxDO 统一账号配置")
                         return accounts
@@ -557,60 +572,66 @@ class AppConfig:
                 logger.error(f"LINUXDO_ACCOUNTS JSON 解析失败: {e}")
             except Exception as e:
                 logger.error(f"加载 LINUXDO_ACCOUNTS 时发生错误: {e}")
-        
+
         # 方式2: 简单环境变量格式
         username = os.getenv("LINUXDO_USERNAME")
         password = os.getenv("LINUXDO_PASSWORD")
         if username and password:
+            # 从环境变量读取可选配置
+            browse_linuxdo = os.getenv("LINUXDO_BROWSE", "true").lower() == "true"
+            browse_count = int(os.getenv("LINUXDO_BROWSE_COUNT", "10"))
+
             accounts.append(LinuxDOAccount(
                 username=username,
                 password=password,
                 sites=list(NEWAPI_SITES.keys()),
+                browse_linuxdo=browse_linuxdo,
+                browse_count=browse_count,
                 name=username,
             ))
-            logger.info(f"成功加载 LinuxDO 账号: {username} (签到所有站点)")
-        
+            logger.info(f"成功加载 LinuxDO 账号: {username} (签到所有站点, 浏览帖子: {browse_linuxdo})")
+
         return accounts
-    
+
     @classmethod
-    def _load_anyrouter_accounts(cls) -> List[AnyRouterAccount]:
+    def _load_anyrouter_accounts(cls) -> list[AnyRouterAccount]:
         """从环境变量加载 AnyRouter 账号配置"""
         accounts_str = os.getenv("ANYROUTER_ACCOUNTS")
         if not accounts_str:
             return []
-        
+
         try:
             accounts_data = json.loads(accounts_str)
-            
+
             if not isinstance(accounts_data, list):
                 logger.error("ANYROUTER_ACCOUNTS 配置格式错误: 必须是 JSON 数组格式")
                 return []
-            
+
             accounts = []
             for i, account_dict in enumerate(accounts_data):
                 if not isinstance(account_dict, dict):
                     logger.error(f"账号 {i + 1} 配置格式错误: 必须是 JSON 对象")
                     continue
-                
+
                 if "cookies" not in account_dict or "api_user" not in account_dict:
                     logger.error(f"账号 {i + 1} 缺少必填字段: 需要 'cookies' 和 'api_user'")
                     continue
-                
+
                 accounts.append(AnyRouterAccount.from_dict(account_dict, i))
-            
+
             if accounts:
                 logger.info(f"成功加载 {len(accounts)} 个 AnyRouter 账号配置")
             return accounts
-            
+
         except json.JSONDecodeError as e:
             logger.error(f"ANYROUTER_ACCOUNTS JSON 解析失败: {e}")
             return []
         except Exception as e:
             logger.error(f"加载 ANYROUTER_ACCOUNTS 时发生错误: {e}")
             return []
-    
+
     @classmethod
-    def _load_providers(cls) -> Dict[str, ProviderConfig]:
+    def _load_providers(cls) -> dict[str, ProviderConfig]:
         """加载 Provider 配置"""
         providers = {
             "anyrouter": ProviderConfig(
@@ -636,7 +657,7 @@ class AppConfig:
                 waf_cookie_names=None,
             ),
         }
-        
+
         providers_str = os.getenv("PROVIDERS")
         if providers_str:
             try:
@@ -644,7 +665,7 @@ class AppConfig:
                 if not isinstance(providers_data, dict):
                     logger.warning("PROVIDERS 必须是 JSON 对象格式")
                     return providers
-                
+
                 for name, provider_data in providers_data.items():
                     try:
                         providers[name] = ProviderConfig.from_dict(name, provider_data)
@@ -652,20 +673,20 @@ class AppConfig:
                         logger.error(f"Provider '{name}' 缺少必填字段: {e}")
                     except Exception as e:
                         logger.warning(f"解析 Provider '{name}' 失败: {e}")
-                
+
                 logger.info(f"从 PROVIDERS 加载了 {len(providers_data)} 个自定义配置")
             except json.JSONDecodeError as e:
                 logger.warning(f"PROVIDERS JSON 解析失败: {e}")
             except Exception as e:
                 logger.warning(f"加载 PROVIDERS 时发生错误: {e}")
-        
+
         return providers
 
-    def get_provider(self, name: str) -> Optional[ProviderConfig]:
+    def get_provider(self, name: str) -> ProviderConfig | None:
         return self.providers.get(name)
-    
+
     def has_any_config(self) -> bool:
-        return (len(self.anyrouter_accounts) > 0 or len(self.wong_accounts) > 0 
+        return (len(self.anyrouter_accounts) > 0 or len(self.wong_accounts) > 0
                 or len(self.elysiver_accounts) > 0 or len(self.kfcapi_accounts) > 0
                 or len(self.duckcoding_accounts) > 0 or len(self.linuxdo_accounts) > 0)
 
@@ -674,7 +695,7 @@ class AppConfig:
 AccountConfig = AnyRouterAccount
 
 
-def load_accounts_config() -> Optional[List[AnyRouterAccount]]:
+def load_accounts_config() -> list[AnyRouterAccount] | None:
     """从环境变量加载账号配置（向后兼容函数）"""
     accounts = AppConfig._load_anyrouter_accounts()
     return accounts if accounts else None
