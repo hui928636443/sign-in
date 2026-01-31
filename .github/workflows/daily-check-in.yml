@@ -53,10 +53,10 @@ jobs:
       - name: Execute multi-platform check-in
         env:
           # 浏览器引擎配置
-          # drissionpage: 不基于 WebDriver，较难被 Cloudflare 检测（推荐）
-          # nodriver: 不基于 WebDriver，直接使用 CDP
+          # nodriver: 不基于 WebDriver，直接使用 CDP，最难被检测（推荐）
+          # drissionpage: 不基于 WebDriver，较难被 Cloudflare 检测
           # patchright: 反检测 Chromium（备用）
-          BROWSER_ENGINE: drissionpage
+          BROWSER_ENGINE: nodriver
           DISPLAY: ":99"
           
           # AnyRouter 配置

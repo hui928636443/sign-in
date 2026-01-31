@@ -27,8 +27,8 @@ from utils.oauth_helpers import is_oauth_related_url
 # 浏览器引擎类型
 BrowserEngine = Literal["nodriver", "drissionpage", "camoufox", "patchright"]
 
-# 默认使用 DrissionPage（不基于 WebDriver，较难被 Cloudflare 检测）
-DEFAULT_ENGINE: BrowserEngine = "drissionpage"
+# 默认使用 nodriver（最难被 Cloudflare 检测）
+DEFAULT_ENGINE: BrowserEngine = "nodriver"
 
 # Camoufox 用户数据目录
 CAMOUFOX_PROFILE_DIR = Path(".camoufox_profile")
