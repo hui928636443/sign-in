@@ -144,10 +144,10 @@ class WongAdapter(BasePlatformAdapter):
             await self.page.goto(self.LOGIN_URL, wait_until="networkidle")
             await asyncio.sleep(2)
             
-            # Step 2: 点击 "使用 LinuxDO 继续" 按钮
-            logger.info(f"[{self.account_name}] 点击 LinuxDO 登录按钮...")
+            # Step 2: 查找并点击 "使用 LinuxDO 继续" 按钮
+            logger.info(f"[{self.account_name}] 查找 LinuxDO 登录按钮...")
             
-            # 先勾选同意协议
+            # 先勾选同意协议（如果有）
             checkbox = await self.page.query_selector('input[type="checkbox"]')
             if checkbox:
                 is_checked = await checkbox.is_checked()
@@ -155,15 +155,29 @@ class WongAdapter(BasePlatformAdapter):
                     await checkbox.click()
                     await asyncio.sleep(0.5)
             
-            # 点击 LinuxDO 登录按钮
+            # 尝试直接找 LinuxDO 按钮
             linuxdo_btn = await self.page.query_selector('button:has-text("使用 LinuxDO 继续")')
             if not linuxdo_btn:
                 linuxdo_btn = await self.page.query_selector('button:has-text("LinuxDO")')
+            
+            # 如果没找到，尝试点击"注册"按钮（很多站点 LinuxDO 按钮在注册页）
+            if not linuxdo_btn:
+                logger.info(f"[{self.account_name}] 登录页未找到 LinuxDO 按钮，尝试切换到注册页...")
+                register_btn = await self.page.query_selector('button:has-text("注册")')
+                if register_btn:
+                    await register_btn.click()
+                    await asyncio.sleep(2)
+                    
+                    # 再次查找 LinuxDO 按钮
+                    linuxdo_btn = await self.page.query_selector('button:has-text("使用 LinuxDO 继续")')
+                    if not linuxdo_btn:
+                        linuxdo_btn = await self.page.query_selector('button:has-text("LinuxDO")')
             
             if not linuxdo_btn:
                 logger.error(f"[{self.account_name}] 未找到 LinuxDO 登录按钮")
                 return False
             
+            logger.info(f"[{self.account_name}] 点击 LinuxDO 登录按钮...")
             await linuxdo_btn.click()
             await asyncio.sleep(3)
             
