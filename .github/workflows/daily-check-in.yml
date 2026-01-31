@@ -39,13 +39,26 @@ jobs:
       - name: Install dependencies
         run: uv sync
       
-      # 安装 Patchright 浏览器 (用于 WAF bypass)
+      # 安装 Xvfb 虚拟显示（用于绕过 Cloudflare 的 headless 检测）
+      - name: Install Xvfb and Chrome
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb google-chrome-stable
+      
+      # 安装 Patchright 浏览器（备用）
       - name: Install Patchright browsers
         run: uv run patchright install chromium
       
-      # 执行签到
+      # 执行签到（使用 xvfb-run 模拟显示器）
       - name: Execute multi-platform check-in
         env:
+          # 浏览器引擎配置
+          # nodriver: 不基于 WebDriver，直接使用 CDP，最难被检测（推荐）
+          # drissionpage: 不基于 WebDriver，较难被 Cloudflare 检测
+          # patchright: 反检测 Chromium（备用）
+          BROWSER_ENGINE: nodriver
+          DISPLAY: ":99"
+          
           # AnyRouter 配置
           ANYROUTER_ACCOUNTS: ${{ secrets.ANYROUTER_ACCOUNTS }}
           PROVIDERS: ${{ secrets.PROVIDERS }}
@@ -100,10 +113,11 @@ jobs:
           BARK_KEY: ${{ secrets.BARK_KEY }}
           BARK_SERVER: ${{ secrets.BARK_SERVER }}
         run: |
+          # 使用 xvfb-run 启动，模拟显示器绕过 Cloudflare headless 检测
           if [ -n "${{ github.event.inputs.platform }}" ]; then
-            uv run python main.py --platform ${{ github.event.inputs.platform }}
+            xvfb-run --server-args="-screen 0 1920x1080x24" uv run python main.py --platform ${{ github.event.inputs.platform }}
           else
-            uv run python main.py
+            xvfb-run --server-args="-screen 0 1920x1080x24" uv run python main.py
           fi
 
 
