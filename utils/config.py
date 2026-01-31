@@ -82,6 +82,231 @@ class WongAccount:
 
 
 @dataclass
+class ElysiverAccount:
+    """Elysiver 账号配置
+    
+    支持两种登录方式：
+    1. LinuxDO OAuth（优先）
+    2. Cookie 回退
+    """
+    
+    linuxdo_username: Optional[str] = None
+    linuxdo_password: Optional[str] = None
+    fallback_cookies: Optional[str] = None
+    api_user: Optional[str] = None
+    name: Optional[str] = None
+    
+    @classmethod
+    def from_dict(cls, data: dict, index: int) -> "ElysiverAccount":
+        """从字典创建 ElysiverAccount"""
+        name = data.get("name") or f"Elysiver Account {index + 1}"
+        return cls(
+            linuxdo_username=data.get("linuxdo_username"),
+            linuxdo_password=data.get("linuxdo_password"),
+            fallback_cookies=data.get("fallback_cookies") or data.get("cookies"),
+            api_user=data.get("api_user"),
+            name=name,
+        )
+    
+    def get_display_name(self, index: int) -> str:
+        if self.name:
+            return self.name
+        if self.linuxdo_username:
+            return self.linuxdo_username
+        return f"Elysiver Account {index + 1}"
+
+
+@dataclass
+class KFCAPIAccount:
+    """KFC API 账号配置
+    
+    支持两种登录方式：
+    1. LinuxDO OAuth（优先）
+    2. Cookie 回退
+    """
+    
+    linuxdo_username: Optional[str] = None
+    linuxdo_password: Optional[str] = None
+    fallback_cookies: Optional[str] = None
+    api_user: Optional[str] = None
+    name: Optional[str] = None
+    
+    @classmethod
+    def from_dict(cls, data: dict, index: int) -> "KFCAPIAccount":
+        """从字典创建 KFCAPIAccount"""
+        name = data.get("name") or f"KFC API Account {index + 1}"
+        return cls(
+            linuxdo_username=data.get("linuxdo_username"),
+            linuxdo_password=data.get("linuxdo_password"),
+            fallback_cookies=data.get("fallback_cookies") or data.get("cookies"),
+            api_user=data.get("api_user"),
+            name=name,
+        )
+    
+    def get_display_name(self, index: int) -> str:
+        if self.name:
+            return self.name
+        if self.linuxdo_username:
+            return self.linuxdo_username
+        return f"KFC API Account {index + 1}"
+
+
+@dataclass
+class DuckCodingAccount:
+    """Free DuckCoding 账号配置
+    
+    支持两种登录方式：
+    1. LinuxDO OAuth（优先）
+    2. Cookie 回退
+    """
+    
+    linuxdo_username: Optional[str] = None
+    linuxdo_password: Optional[str] = None
+    fallback_cookies: Optional[str] = None
+    api_user: Optional[str] = None
+    name: Optional[str] = None
+    
+    @classmethod
+    def from_dict(cls, data: dict, index: int) -> "DuckCodingAccount":
+        """从字典创建 DuckCodingAccount"""
+        name = data.get("name") or f"DuckCoding Account {index + 1}"
+        return cls(
+            linuxdo_username=data.get("linuxdo_username"),
+            linuxdo_password=data.get("linuxdo_password"),
+            fallback_cookies=data.get("fallback_cookies") or data.get("cookies"),
+            api_user=data.get("api_user"),
+            name=name,
+        )
+    
+    def get_display_name(self, index: int) -> str:
+        if self.name:
+            return self.name
+        if self.linuxdo_username:
+            return self.linuxdo_username
+        return f"DuckCoding Account {index + 1}"
+
+
+# 支持的 NewAPI 站点列表
+NEWAPI_SITES = {
+    "wong": {
+        "name": "WONG公益站",
+        "domain": "https://wzw.pp.ua",
+        "cookie_domain": "wzw.pp.ua",
+        "currency": "$",
+    },
+    "elysiver": {
+        "name": "Elysiver",
+        "domain": "https://elysiver.h-e.top",
+        "cookie_domain": "h-e.top",
+        "currency": "E ",
+    },
+    "kfcapi": {
+        "name": "KFC API",
+        "domain": "https://kfc-api.sxxe.net",
+        "cookie_domain": "kfc-api.sxxe.net",
+        "currency": "$",
+    },
+    "duckcoding": {
+        "name": "Free DuckCoding",
+        "domain": "https://free.duckcoding.com",
+        "cookie_domain": "free.duckcoding.com",
+        "currency": "¥",
+    },
+    "runanytime": {
+        "name": "随时跑路",
+        "domain": "https://runanytime.hxi.me",
+        "cookie_domain": "runanytime.hxi.me",
+        "currency": "$",
+    },
+    "neb": {
+        "name": "NEB公益站",
+        "domain": "https://ai.zzhdsgsss.xyz",
+        "cookie_domain": "ai.zzhdsgsss.xyz",
+        "currency": "$",
+    },
+    "zeroliya": {
+        "name": "小呆公益站",
+        "domain": "https://new.184772.xyz",
+        "cookie_domain": "new.184772.xyz",
+        "currency": "$",
+    },
+    "mitchll": {
+        "name": "Mitchll-api公益站",
+        "domain": "https://api.mitchll.com",
+        "cookie_domain": "api.mitchll.com",
+        "currency": "$",
+    },
+    "kingo": {
+        "name": "Kingo API公益站",
+        "domain": "https://new-api-bxhm.onrender.com",
+        "cookie_domain": "new-api-bxhm.onrender.com",
+        "currency": "$",
+    },
+    "techstar": {
+        "name": "TechnologyStar",
+        "domain": "https://aidrouter.qzz.io",
+        "cookie_domain": "aidrouter.qzz.io",
+        "currency": "$",
+    },
+    "lightllm": {
+        "name": "轻のLLM",
+        "domain": "https://lightllm.online",
+        "cookie_domain": "lightllm.online",
+        "currency": "$",
+    },
+    "hotaru": {
+        "name": "Hotaru API",
+        "domain": "https://api.hotaruapi.top",
+        "cookie_domain": "api.hotaruapi.top",
+        "currency": "$",
+    },
+    "dev88": {
+        "name": "DEV88公益站",
+        "domain": "https://api.dev88.tech",
+        "cookie_domain": "api.dev88.tech",
+        "currency": "$",
+    },
+    "huan": {
+        "name": "huan公益站",
+        "domain": "https://ai.huan666.de",
+        "cookie_domain": "ai.huan666.de",
+        "currency": "$",
+    },
+}
+
+
+@dataclass
+class LinuxDOAccount:
+    """LinuxDO 统一账号配置
+    
+    一个 LinuxDO 账号可以签到多个支持 LinuxDO OAuth 的站点。
+    """
+    
+    username: str
+    password: str
+    sites: List[str] = field(default_factory=lambda: list(NEWAPI_SITES.keys()))
+    name: Optional[str] = None
+    
+    @classmethod
+    def from_dict(cls, data: dict, index: int) -> "LinuxDOAccount":
+        """从字典创建 LinuxDOAccount"""
+        name = data.get("name") or data.get("username") or f"LinuxDO Account {index + 1}"
+        # 默认签到所有站点
+        sites = data.get("sites", list(NEWAPI_SITES.keys()))
+        return cls(
+            username=data["username"],
+            password=data["password"],
+            sites=sites,
+            name=name,
+        )
+    
+    def get_display_name(self, index: int) -> str:
+        if self.name:
+            return self.name
+        return self.username or f"LinuxDO Account {index + 1}"
+
+
+@dataclass
 class ProviderConfig:
     """Provider 配置"""
 
@@ -146,17 +371,29 @@ class AppConfig:
 
     anyrouter_accounts: List[AnyRouterAccount] = field(default_factory=list)
     wong_accounts: List[WongAccount] = field(default_factory=list)
+    elysiver_accounts: List[ElysiverAccount] = field(default_factory=list)
+    kfcapi_accounts: List[KFCAPIAccount] = field(default_factory=list)
+    duckcoding_accounts: List[DuckCodingAccount] = field(default_factory=list)
+    linuxdo_accounts: List[LinuxDOAccount] = field(default_factory=list)
     providers: Dict[str, ProviderConfig] = field(default_factory=dict)
 
     @classmethod
     def load_from_env(cls) -> "AppConfig":
         """从环境变量加载完整配置"""
         wong_accounts = cls._load_wong_accounts()
+        elysiver_accounts = cls._load_elysiver_accounts()
+        kfcapi_accounts = cls._load_kfcapi_accounts()
+        duckcoding_accounts = cls._load_duckcoding_accounts()
+        linuxdo_accounts = cls._load_linuxdo_accounts()
         anyrouter_accounts = cls._load_anyrouter_accounts()
         providers = cls._load_providers()
         return cls(
             anyrouter_accounts=anyrouter_accounts,
             wong_accounts=wong_accounts,
+            elysiver_accounts=elysiver_accounts,
+            kfcapi_accounts=kfcapi_accounts,
+            duckcoding_accounts=duckcoding_accounts,
+            linuxdo_accounts=linuxdo_accounts,
             providers=providers,
         )
     
@@ -188,6 +425,152 @@ class AppConfig:
                 logger.error(f"WONG_ACCOUNTS JSON 解析失败: {e}")
             except Exception as e:
                 logger.error(f"加载 WONG_ACCOUNTS 时发生错误: {e}")
+        
+        return accounts
+    
+    @classmethod
+    def _load_elysiver_accounts(cls) -> List[ElysiverAccount]:
+        """从环境变量加载 Elysiver 账号配置"""
+        accounts = []
+        
+        # 从 ELYSIVER_ACCOUNTS 环境变量加载
+        accounts_str = os.getenv("ELYSIVER_ACCOUNTS")
+        if accounts_str:
+            try:
+                accounts_data = json.loads(accounts_str)
+                
+                if not isinstance(accounts_data, list):
+                    logger.error("ELYSIVER_ACCOUNTS 配置格式错误: 必须是 JSON 数组格式")
+                else:
+                    for i, account_dict in enumerate(accounts_data):
+                        if not isinstance(account_dict, dict):
+                            logger.error(f"Elysiver 账号 {i + 1} 配置格式错误: 必须是 JSON 对象")
+                            continue
+                        
+                        accounts.append(ElysiverAccount.from_dict(account_dict, i))
+                    
+                    if accounts:
+                        logger.info(f"成功加载 {len(accounts)} 个 Elysiver 账号配置 (JSON 格式)")
+                        return accounts
+            except json.JSONDecodeError as e:
+                logger.error(f"ELYSIVER_ACCOUNTS JSON 解析失败: {e}")
+            except Exception as e:
+                logger.error(f"加载 ELYSIVER_ACCOUNTS 时发生错误: {e}")
+        
+        return accounts
+    
+    @classmethod
+    def _load_kfcapi_accounts(cls) -> List[KFCAPIAccount]:
+        """从环境变量加载 KFC API 账号配置"""
+        accounts = []
+        
+        # 从 KFCAPI_ACCOUNTS 环境变量加载
+        accounts_str = os.getenv("KFCAPI_ACCOUNTS")
+        if accounts_str:
+            try:
+                accounts_data = json.loads(accounts_str)
+                
+                if not isinstance(accounts_data, list):
+                    logger.error("KFCAPI_ACCOUNTS 配置格式错误: 必须是 JSON 数组格式")
+                else:
+                    for i, account_dict in enumerate(accounts_data):
+                        if not isinstance(account_dict, dict):
+                            logger.error(f"KFC API 账号 {i + 1} 配置格式错误: 必须是 JSON 对象")
+                            continue
+                        
+                        accounts.append(KFCAPIAccount.from_dict(account_dict, i))
+                    
+                    if accounts:
+                        logger.info(f"成功加载 {len(accounts)} 个 KFC API 账号配置 (JSON 格式)")
+                        return accounts
+            except json.JSONDecodeError as e:
+                logger.error(f"KFCAPI_ACCOUNTS JSON 解析失败: {e}")
+            except Exception as e:
+                logger.error(f"加载 KFCAPI_ACCOUNTS 时发生错误: {e}")
+        
+        return accounts
+    
+    @classmethod
+    def _load_duckcoding_accounts(cls) -> List[DuckCodingAccount]:
+        """从环境变量加载 Free DuckCoding 账号配置"""
+        accounts = []
+        
+        accounts_str = os.getenv("DUCKCODING_ACCOUNTS")
+        if accounts_str:
+            try:
+                accounts_data = json.loads(accounts_str)
+                
+                if not isinstance(accounts_data, list):
+                    logger.error("DUCKCODING_ACCOUNTS 配置格式错误: 必须是 JSON 数组格式")
+                else:
+                    for i, account_dict in enumerate(accounts_data):
+                        if not isinstance(account_dict, dict):
+                            logger.error(f"DuckCoding 账号 {i + 1} 配置格式错误: 必须是 JSON 对象")
+                            continue
+                        
+                        accounts.append(DuckCodingAccount.from_dict(account_dict, i))
+                    
+                    if accounts:
+                        logger.info(f"成功加载 {len(accounts)} 个 DuckCoding 账号配置 (JSON 格式)")
+                        return accounts
+            except json.JSONDecodeError as e:
+                logger.error(f"DUCKCODING_ACCOUNTS JSON 解析失败: {e}")
+            except Exception as e:
+                logger.error(f"加载 DUCKCODING_ACCOUNTS 时发生错误: {e}")
+        
+        return accounts
+    
+    @classmethod
+    def _load_linuxdo_accounts(cls) -> List[LinuxDOAccount]:
+        """从环境变量加载 LinuxDO 统一账号配置
+        
+        支持两种格式：
+        1. LINUXDO_ACCOUNTS: JSON 数组格式，支持多账号和站点选择
+        2. LINUXDO_USERNAME + LINUXDO_PASSWORD: 简单格式，单账号签到所有站点
+        """
+        accounts = []
+        
+        # 方式1: JSON 数组格式
+        accounts_str = os.getenv("LINUXDO_ACCOUNTS")
+        if accounts_str:
+            try:
+                accounts_data = json.loads(accounts_str)
+                
+                if not isinstance(accounts_data, list):
+                    logger.error("LINUXDO_ACCOUNTS 配置格式错误: 必须是 JSON 数组格式")
+                else:
+                    for i, account_dict in enumerate(accounts_data):
+                        if not isinstance(account_dict, dict):
+                            logger.error(f"LinuxDO 账号 {i + 1} 配置格式错误: 必须是 JSON 对象")
+                            continue
+                        
+                        if "username" not in account_dict or "password" not in account_dict:
+                            logger.error(f"LinuxDO 账号 {i + 1} 缺少必填字段: 需要 'username' 和 'password'")
+                            continue
+                        
+                        accounts.append(LinuxDOAccount.from_dict(account_dict, i))
+                    
+                    if accounts:
+                        logger.info(f"成功加载 {len(accounts)} 个 LinuxDO 统一账号配置")
+                        return accounts
+            except json.JSONDecodeError as e:
+                logger.error(f"LINUXDO_ACCOUNTS JSON 解析失败: {e}")
+            except Exception as e:
+                logger.error(f"加载 LINUXDO_ACCOUNTS 时发生错误: {e}")
+        
+        # 方式2: 简单环境变量格式
+        username = os.getenv("LINUXDO_USERNAME")
+        password = os.getenv("LINUXDO_PASSWORD")
+        if username and password:
+            accounts.append(LinuxDOAccount(
+                username=username,
+                password=password,
+                sites=list(NEWAPI_SITES.keys()),
+                name=username,
+            ))
+            logger.info(f"成功加载 LinuxDO 账号: {username} (签到所有站点)")
+        
+        return accounts
         
         return accounts
     
@@ -284,7 +667,9 @@ class AppConfig:
         return self.providers.get(name)
     
     def has_any_config(self) -> bool:
-        return len(self.anyrouter_accounts) > 0 or len(self.wong_accounts) > 0
+        return (len(self.anyrouter_accounts) > 0 or len(self.wong_accounts) > 0 
+                or len(self.elysiver_accounts) > 0 or len(self.kfcapi_accounts) > 0
+                or len(self.duckcoding_accounts) > 0 or len(self.linuxdo_accounts) > 0)
 
 
 # Backward compatibility alias

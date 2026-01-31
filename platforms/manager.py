@@ -16,8 +16,23 @@ from loguru import logger
 
 from platforms.anyrouter import AnyRouterAdapter
 from platforms.base import CheckinResult, CheckinStatus
+from platforms.duckcoding import DuckCodingAdapter
+from platforms.elysiver import ElysiverAdapter
+from platforms.kfcapi import KFCAPIAdapter
+from platforms.neb import NEBAdapter
+from platforms.runanytime import RunAnytimeAdapter
 from platforms.wong import WongAdapter
-from utils.config import AppConfig
+from platforms.newapi_sites import (
+    ZeroLiyaAdapter,
+    MitchllAdapter,
+    KingoAdapter,
+    TechStarAdapter,
+    LightLLMAdapter,
+    HotaruAdapter,
+    DEV88Adapter,
+    HuanAdapter,
+)
+from utils.config import AppConfig, NEWAPI_SITES
 from utils.notify import NotificationManager
 
 
@@ -49,6 +64,22 @@ class PlatformManager:
         wong_results = await self._run_wong_accounts_only()
         self.results.extend(wong_results)
         
+        # Elysiver
+        elysiver_results = await self._run_all_elysiver()
+        self.results.extend(elysiver_results)
+        
+        # KFC API
+        kfcapi_results = await self._run_all_kfcapi()
+        self.results.extend(kfcapi_results)
+        
+        # Free DuckCoding
+        duckcoding_results = await self._run_all_duckcoding()
+        self.results.extend(duckcoding_results)
+        
+        # LinuxDO 统一账号（签到多个站点）
+        linuxdo_results = await self._run_all_linuxdo()
+        self.results.extend(linuxdo_results)
+        
         # AnyRouter 类平台（包括 provider=wong 和 provider=anyrouter）
         anyrouter_results = await self._run_all_anyrouter()
         self.results.extend(anyrouter_results)
@@ -59,7 +90,7 @@ class PlatformManager:
         """运行指定平台签到
         
         Args:
-            platform: 平台名称 ("wong" 或 "anyrouter")
+            platform: 平台名称 ("wong", "elysiver", "kfcapi", "duckcoding", "linuxdo" 或 "anyrouter")
         
         Returns:
             list[CheckinResult]: 签到结果
@@ -74,6 +105,18 @@ class PlatformManager:
         if platform_lower == "wong":
             wong_results = await self._run_all_wong()
             self.results.extend(wong_results)
+        elif platform_lower == "elysiver":
+            elysiver_results = await self._run_all_elysiver()
+            self.results.extend(elysiver_results)
+        elif platform_lower == "kfcapi":
+            kfcapi_results = await self._run_all_kfcapi()
+            self.results.extend(kfcapi_results)
+        elif platform_lower == "duckcoding":
+            duckcoding_results = await self._run_all_duckcoding()
+            self.results.extend(duckcoding_results)
+        elif platform_lower == "linuxdo":
+            linuxdo_results = await self._run_all_linuxdo()
+            self.results.extend(linuxdo_results)
         elif platform_lower == "anyrouter":
             anyrouter_results = await self._run_all_anyrouter()
             self.results.extend(anyrouter_results)
@@ -153,6 +196,161 @@ class PlatformManager:
         
         if not results:
             logger.info("WONG 公益站未配置")
+        
+        return results
+    
+    async def _run_all_elysiver(self) -> list[CheckinResult]:
+        """运行所有 Elysiver 账号签到"""
+        if not self.config.elysiver_accounts:
+            return []
+        
+        results = []
+        for i, account in enumerate(self.config.elysiver_accounts):
+            logger.info(f"开始执行 Elysiver 账号 {i + 1}: {account.get_display_name(i)}")
+            
+            adapter = ElysiverAdapter(
+                linuxdo_username=account.linuxdo_username,
+                linuxdo_password=account.linuxdo_password,
+                fallback_cookies=account.fallback_cookies,
+                api_user=account.api_user,
+                account_name=account.get_display_name(i),
+            )
+            
+            try:
+                result = await adapter.run()
+                results.append(result)
+            except Exception as e:
+                logger.error(f"Elysiver 账号 {i + 1} 执行异常: {e}")
+                results.append(CheckinResult(
+                    platform="Elysiver",
+                    account=account.get_display_name(i),
+                    status=CheckinStatus.FAILED,
+                    message=f"执行异常: {str(e)}",
+                ))
+        
+        return results
+    
+    async def _run_all_kfcapi(self) -> list[CheckinResult]:
+        """运行所有 KFC API 账号签到"""
+        if not self.config.kfcapi_accounts:
+            return []
+        
+        results = []
+        for i, account in enumerate(self.config.kfcapi_accounts):
+            logger.info(f"开始执行 KFC API 账号 {i + 1}: {account.get_display_name(i)}")
+            
+            adapter = KFCAPIAdapter(
+                linuxdo_username=account.linuxdo_username,
+                linuxdo_password=account.linuxdo_password,
+                fallback_cookies=account.fallback_cookies,
+                api_user=account.api_user,
+                account_name=account.get_display_name(i),
+            )
+            
+            try:
+                result = await adapter.run()
+                results.append(result)
+            except Exception as e:
+                logger.error(f"KFC API 账号 {i + 1} 执行异常: {e}")
+                results.append(CheckinResult(
+                    platform="KFC API",
+                    account=account.get_display_name(i),
+                    status=CheckinStatus.FAILED,
+                    message=f"执行异常: {str(e)}",
+                ))
+        
+        return results
+    
+    async def _run_all_duckcoding(self) -> list[CheckinResult]:
+        """运行所有 Free DuckCoding 账号签到"""
+        if not self.config.duckcoding_accounts:
+            return []
+        
+        results = []
+        for i, account in enumerate(self.config.duckcoding_accounts):
+            logger.info(f"开始执行 DuckCoding 账号 {i + 1}: {account.get_display_name(i)}")
+            
+            adapter = DuckCodingAdapter(
+                linuxdo_username=account.linuxdo_username,
+                linuxdo_password=account.linuxdo_password,
+                fallback_cookies=account.fallback_cookies,
+                api_user=account.api_user,
+                account_name=account.get_display_name(i),
+            )
+            
+            try:
+                result = await adapter.run()
+                results.append(result)
+            except Exception as e:
+                logger.error(f"DuckCoding 账号 {i + 1} 执行异常: {e}")
+                results.append(CheckinResult(
+                    platform="Free DuckCoding",
+                    account=account.get_display_name(i),
+                    status=CheckinStatus.FAILED,
+                    message=f"执行异常: {str(e)}",
+                ))
+        
+        return results
+    
+    async def _run_all_linuxdo(self) -> list[CheckinResult]:
+        """运行 LinuxDO 统一账号签到（一个账号签到多个站点）"""
+        if not self.config.linuxdo_accounts:
+            return []
+        
+        results = []
+        
+        # 站点到适配器的映射
+        site_adapters = {
+            "wong": WongAdapter,
+            "elysiver": ElysiverAdapter,
+            "kfcapi": KFCAPIAdapter,
+            "duckcoding": DuckCodingAdapter,
+            "runanytime": RunAnytimeAdapter,
+            "neb": NEBAdapter,
+            "zeroliya": ZeroLiyaAdapter,
+            "mitchll": MitchllAdapter,
+            "kingo": KingoAdapter,
+            "techstar": TechStarAdapter,
+            "lightllm": LightLLMAdapter,
+            "hotaru": HotaruAdapter,
+            "dev88": DEV88Adapter,
+            "huan": HuanAdapter,
+        }
+        
+        for i, account in enumerate(self.config.linuxdo_accounts):
+            logger.info(f"开始执行 LinuxDO 账号: {account.get_display_name(i)}")
+            logger.info(f"  将签到站点: {', '.join(account.sites)}")
+            
+            for site_key in account.sites:
+                if site_key not in site_adapters:
+                    logger.warning(f"  未知站点: {site_key}，跳过")
+                    continue
+                
+                site_info = NEWAPI_SITES.get(site_key, {})
+                site_name = site_info.get("name", site_key)
+                
+                logger.info(f"  签到 {site_name}...")
+                
+                adapter_class = site_adapters[site_key]
+                adapter = adapter_class(
+                    linuxdo_username=account.username,
+                    linuxdo_password=account.password,
+                    account_name=account.get_display_name(i),
+                )
+                
+                try:
+                    result = await adapter.run()
+                    results.append(result)
+                except Exception as e:
+                    logger.error(f"  {site_name} 签到异常: {e}")
+                    results.append(CheckinResult(
+                        platform=site_name,
+                        account=account.get_display_name(i),
+                        status=CheckinStatus.FAILED,
+                        message=f"执行异常: {str(e)}",
+                    ))
+        
+        return results
         
         return results
     

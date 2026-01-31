@@ -6,6 +6,11 @@
 
 from platforms.base import BasePlatformAdapter, CheckinResult, CheckinStatus
 from platforms.anyrouter import AnyRouterAdapter
+from platforms.duckcoding import DuckCodingAdapter
+from platforms.elysiver import ElysiverAdapter
+from platforms.kfcapi import KFCAPIAdapter
+from platforms.neb import NEBAdapter
+from platforms.runanytime import RunAnytimeAdapter
 from platforms.manager import PlatformManager
 
 __all__ = [
@@ -13,5 +18,10 @@ __all__ = [
     "CheckinResult",
     "CheckinStatus",
     "AnyRouterAdapter",
+    "DuckCodingAdapter",
+    "ElysiverAdapter",
+    "KFCAPIAdapter",
+    "NEBAdapter",
+    "RunAnytimeAdapter",
     "PlatformManager",
 ]

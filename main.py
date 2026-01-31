@@ -65,7 +65,7 @@ def parse_args() -> argparse.Namespace:
     
     parser.add_argument(
         "--platform", "-p",
-        choices=["anyrouter", "wong"],
+        choices=["anyrouter", "wong", "elysiver", "kfcapi", "duckcoding", "linuxdo"],
         help="指定要运行的平台（默认运行所有平台）",
     )
     
@@ -119,6 +119,39 @@ def show_config(config: AppConfig) -> None:
     else:
         print(f"\n[WONG] 未配置")
     
+    # Elysiver
+    if config.elysiver_accounts:
+        print(f"\n[Elysiver] {len(config.elysiver_accounts)} 个账号")
+        for i, account in enumerate(config.elysiver_accounts):
+            print(f"  账号 {i + 1}: {account.get_display_name(i)}")
+    else:
+        print(f"\n[Elysiver] 未配置")
+    
+    # KFC API
+    if config.kfcapi_accounts:
+        print(f"\n[KFC API] {len(config.kfcapi_accounts)} 个账号")
+        for i, account in enumerate(config.kfcapi_accounts):
+            print(f"  账号 {i + 1}: {account.get_display_name(i)}")
+    else:
+        print(f"\n[KFC API] 未配置")
+    
+    # Free DuckCoding
+    if config.duckcoding_accounts:
+        print(f"\n[Free DuckCoding] {len(config.duckcoding_accounts)} 个账号")
+        for i, account in enumerate(config.duckcoding_accounts):
+            print(f"  账号 {i + 1}: {account.get_display_name(i)}")
+    else:
+        print(f"\n[Free DuckCoding] 未配置")
+    
+    # LinuxDO 统一账号
+    if config.linuxdo_accounts:
+        print(f"\n[LinuxDO 统一账号] {len(config.linuxdo_accounts)} 个账号")
+        for i, account in enumerate(config.linuxdo_accounts):
+            print(f"  账号 {i + 1}: {account.get_display_name(i)}")
+            print(f"    签到站点: {', '.join(account.sites)}")
+    else:
+        print(f"\n[LinuxDO 统一账号] 未配置")
+    
     # Providers
     if config.providers:
         print(f"\n[Providers] {len(config.providers)} 个")
@@ -146,11 +179,17 @@ async def run_checkin(args: argparse.Namespace) -> int:
     # 检查是否有配置
     has_anyrouter = len(config.anyrouter_accounts) > 0
     has_wong = len(config.wong_accounts) > 0
+    has_elysiver = len(config.elysiver_accounts) > 0
+    has_kfcapi = len(config.kfcapi_accounts) > 0
+    has_duckcoding = len(config.duckcoding_accounts) > 0
+    has_linuxdo = len(config.linuxdo_accounts) > 0
     
-    if not has_anyrouter and not has_wong:
+    if not has_anyrouter and not has_wong and not has_elysiver and not has_kfcapi and not has_duckcoding and not has_linuxdo:
         logger.error("未配置任何平台，请设置环境变量")
+        logger.info("推荐: LINUXDO_USERNAME + LINUXDO_PASSWORD (一次配置签到所有站点)")
+        logger.info("或者: LINUXDO_ACCOUNTS (JSON 格式，支持多账号和站点选择)")
+        logger.info("单独配置: WONG_ACCOUNTS, ELYSIVER_ACCOUNTS, KFCAPI_ACCOUNTS, DUCKCODING_ACCOUNTS")
         logger.info("AnyRouter: ANYROUTER_ACCOUNTS")
-        logger.info("WONG: WONG_ACCOUNTS")
         return 1
     
     # 创建平台管理器
