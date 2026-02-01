@@ -17,7 +17,7 @@ from loguru import logger
 
 from platforms.base import CheckinResult, CheckinStatus
 from platforms.linuxdo import LinuxDOAdapter
-from utils.config import AppConfig, DEFAULT_PROVIDERS
+from utils.config import DEFAULT_PROVIDERS, AppConfig
 from utils.notify import NotificationManager
 
 
@@ -81,11 +81,11 @@ class PlatformManager:
                 continue
 
             logger.info(f"开始执行 LinuxDO 浏览: {account.get_display_name(i)}")
-            
+
             # 从 level 计算浏览数量：L1=多看(10个), L2=一般(7个), L3=快速(5个)
             # 但如果用户指定了 browse_count，优先使用用户的设置
             level = getattr(account, 'level', 2) if hasattr(account, 'level') else 2
-            
+
             adapter = LinuxDOAdapter(
                 username=account.username,
                 password=account.password,
@@ -213,7 +213,7 @@ class PlatformManager:
                         try:
                             result = resp.json()
                             msg = result.get("message") or result.get("msg") or ""
-                            
+
                             # 检查各种成功标志
                             if result.get("success") or result.get("ret") == 1 or result.get("code") == 0:
                                 msg = msg or "签到成功"
@@ -256,7 +256,7 @@ class PlatformManager:
                                     message="签到成功",
                                     details=details if details else None,
                                 )
-                    
+
                     logger.error(f"[{account_name}] 签到失败: HTTP {resp.status_code}")
                     return CheckinResult(
                         platform=f"NewAPI ({provider.name})",
