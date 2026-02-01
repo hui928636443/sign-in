@@ -400,7 +400,7 @@ class ProviderConfig:
 DEFAULT_PROVIDERS: dict[str, dict] = {
     "anyrouter": {
         "domain": "https://anyrouter.top",
-        "sign_in_path": "/api/user/checkin",
+        "sign_in_path": None,  # anyrouter 自动签到，不需要调用签到 API
         "bypass_method": "waf_cookies",
         "waf_cookie_names": ["acw_tc", "cdn_sec_tc", "acw_sc__v2"],
     },
