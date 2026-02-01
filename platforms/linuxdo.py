@@ -41,6 +41,7 @@ class LinuxDOAdapter(BasePlatformAdapter):
         password: str,
         browse_count: int = 10,
         account_name: str | None = None,
+        level: int = 2,
     ):
         """初始化 LinuxDO 适配器
 
@@ -49,11 +50,16 @@ class LinuxDOAdapter(BasePlatformAdapter):
             password: LinuxDO 密码
             browse_count: 浏览帖子数量（默认 10）
             account_name: 账号显示名称
+            level: 账号等级 1-3，影响浏览时间
+                   L1: 多看一些时间（慢速浏览）
+                   L2: 一般时间（正常浏览）
+                   L3: 快速浏览
         """
         self.username = username
         self.password = password
         self.browse_count = browse_count
         self._account_name = account_name or username
+        self.level = max(1, min(3, level))  # 限制在 1-3 范围
 
         self._browser_manager: BrowserManager | None = None
         self.client: httpx.Client | None = None
@@ -61,6 +67,7 @@ class LinuxDOAdapter(BasePlatformAdapter):
         self._csrf_token: str | None = None
         self._browsed_count: int = 0
         self._total_time: int = 0
+        self._likes_given: int = 0  # 记录点赞数
 
     @property
     def platform_name(self) -> str:
@@ -226,58 +233,50 @@ class LinuxDOAdapter(BasePlatformAdapter):
             logger.error(f"[{self.account_name}] 输入密码失败: {e}")
             return False
 
-        # 7. 点击登录按钮
+        # 7. 点击登录按钮（使用 JS 点击，比 nodriver 原生 click 更可靠）
         logger.info(f"[{self.account_name}] 点击登录按钮...")
         try:
             # 先等待一下确保表单完全加载
             await asyncio.sleep(1)
 
-            # 方式1: 使用键盘 Enter 提交（最可靠）
-            await tab.evaluate("""
+            # 使用 JS 点击登录按钮（经测试比 nodriver 原生 click 更可靠）
+            clicked = await tab.evaluate("""
                 (function() {
-                    const passwordInput = document.querySelector('#login-account-password') ||
-                                          document.querySelector('input[type="password"]');
-                    if (passwordInput) {
-                        passwordInput.focus();
+                    const btn = document.querySelector('#login-button') ||
+                                document.querySelector('#signin-button') ||
+                                document.querySelector('button[type="submit"]') ||
+                                document.querySelector('input[type="submit"]');
+                    if (btn) {
+                        btn.click();
+                        return true;
                     }
+                    return false;
                 })()
             """)
-            await asyncio.sleep(0.3)
 
-            # 发送 Enter 键
-            await tab.send(nodriver.cdp.input_.dispatch_key_event(
-                type_="keyDown",
-                key="Enter",
-                code="Enter",
-                windows_virtual_key_code=13,
-                native_virtual_key_code=13,
-            ))
-            await tab.send(nodriver.cdp.input_.dispatch_key_event(
-                type_="keyUp",
-                key="Enter",
-                code="Enter",
-                windows_virtual_key_code=13,
-                native_virtual_key_code=13,
-            ))
-            logger.info(f"[{self.account_name}] 已发送 Enter 键提交表单")
+            if clicked:
+                logger.info(f"[{self.account_name}] 已使用 JS 点击登录按钮")
+            else:
+                logger.warning(f"[{self.account_name}] 未找到登录按钮，尝试 Enter 键提交")
+                # 回退到 Enter 键
+                await tab.send(nodriver.cdp.input_.dispatch_key_event(
+                    type_="keyDown",
+                    key="Enter",
+                    code="Enter",
+                    windows_virtual_key_code=13,
+                    native_virtual_key_code=13,
+                ))
+                await tab.send(nodriver.cdp.input_.dispatch_key_event(
+                    type_="keyUp",
+                    key="Enter",
+                    code="Enter",
+                    windows_virtual_key_code=13,
+                    native_virtual_key_code=13,
+                ))
 
         except Exception as e:
-            logger.warning(f"[{self.account_name}] Enter 键提交失败: {e}，尝试点击按钮")
-            # 回退到点击按钮
-            try:
-                await tab.evaluate("""
-                    (function() {
-                        const btn = document.querySelector('#login-button') ||
-                                    document.querySelector('#signin-button') ||
-                                    document.querySelector('button[type="submit"]') ||
-                                    document.querySelector('input[type="submit"]');
-                        if (btn) btn.click();
-                    })()
-                """)
-                logger.info(f"[{self.account_name}] 使用 JS 点击登录按钮")
-            except Exception as e2:
-                logger.error(f"[{self.account_name}] 点击登录按钮也失败: {e2}")
-                return False
+            logger.error(f"[{self.account_name}] 点击登录按钮失败: {e}")
+            return False
 
         # 8. 等待登录完成
         logger.info(f"[{self.account_name}] 等待登录完成...")
@@ -290,16 +289,33 @@ class LinuxDOAdapter(BasePlatformAdapter):
                 logger.info(f"[{self.account_name}] 页面已跳转: {current_url}")
                 break
 
-            # 检查是否有错误提示
-            if i == 5:
+            # 检查是否有错误提示（每 5 秒检查一次）
+            if i % 5 == 0:
                 error_msg = await tab.evaluate("""
                     (function() {
-                        const err = document.querySelector('.alert-error, .error, #error-message, .flash-error');
-                        return err ? err.innerText : '';
+                        // 检查各种错误提示元素
+                        const selectors = [
+                            '.alert-error',
+                            '.error',
+                            '#error-message',
+                            '.flash-error',
+                            '.login-error',
+                            '#login-error',
+                            '.ember-view.alert.alert-error',
+                            '[class*="error"]'
+                        ];
+                        for (const sel of selectors) {
+                            const el = document.querySelector(sel);
+                            if (el && el.innerText && el.innerText.trim()) {
+                                return el.innerText.trim();
+                            }
+                        }
+                        return '';
                     })()
                 """)
                 if error_msg:
                     logger.error(f"[{self.account_name}] 登录错误: {error_msg}")
+                    return False
 
             if i % 10 == 0:
                 logger.debug(f"[{self.account_name}] 等待登录... ({i}s)")
@@ -433,8 +449,13 @@ class LinuxDOAdapter(BasePlatformAdapter):
                         platform=self.platform_name,
                         account=self.account_name,
                         status=CheckinStatus.SUCCESS,
-                        message=f"成功浏览 {browsed} 个帖子（浏览器模式）",
-                        details={"browsed": browsed, "mode": "browser"},
+                        message=f"成功浏览 {browsed} 个帖子，点赞 {self._likes_given} 次（L{self.level}）",
+                        details={
+                            "browsed": browsed,
+                            "likes": self._likes_given,
+                            "level": self.level,
+                            "mode": "browser",
+                        },
                     )
             except Exception as e:
                 logger.warning(f"[{self.account_name}] 浏览器浏览失败，回退到 API 模式: {e}")
@@ -495,11 +516,28 @@ class LinuxDOAdapter(BasePlatformAdapter):
     async def _browse_topics_via_browser(self) -> int:
         """使用浏览器直接浏览帖子（更真实的浏览行为）
 
+        浏览行为：
+        - 每次滑动间隔 3-5 秒
+        - 每个帖子滑动到底部
+        - 随机给几个赞
+        - Level 影响浏览时间：L1 多看，L2 一般，L3 快速
+
         Returns:
             成功浏览的帖子数量
         """
         tab = self._browser_manager.page
         browsed_count = 0
+
+        # 根据 level 设置浏览参数
+        # L1: 慢速浏览（多看）, L2: 正常浏览, L3: 快速浏览
+        level_config = {
+            1: {"scroll_delay": (4, 6), "read_time": (8, 15), "like_chance": 0.4, "scroll_steps": 4},
+            2: {"scroll_delay": (3, 5), "read_time": (5, 10), "like_chance": 0.3, "scroll_steps": 3},
+            3: {"scroll_delay": (2, 4), "read_time": (3, 6), "like_chance": 0.2, "scroll_steps": 2},
+        }
+        config = level_config.get(self.level, level_config[2])
+
+        logger.info(f"[{self.account_name}] 浏览模式: L{self.level} (滑动间隔: {config['scroll_delay']}s)")
 
         # 访问最新帖子页面
         logger.info(f"[{self.account_name}] 访问最新帖子页面...")
@@ -518,7 +556,7 @@ class LinuxDOAdapter(BasePlatformAdapter):
             (function() {
                 const links = document.querySelectorAll('a.title.raw-link, a.title[href*="/t/"]');
                 const result = [];
-                for (let i = 0; i < Math.min(links.length, 15); i++) {
+                for (let i = 0; i < Math.min(links.length, 20); i++) {
                     const a = links[i];
                     if (a.href && a.href.includes('/t/')) {
                         result.push({
@@ -560,22 +598,108 @@ class LinuxDOAdapter(BasePlatformAdapter):
             try:
                 # 访问帖子
                 await tab.get(href)
+                await asyncio.sleep(random.uniform(2, 4))  # 等待页面加载
 
-                # 模拟阅读（随机等待 3-8 秒）
-                read_time = random.uniform(3, 8)
-                logger.debug(f"[{self.account_name}]   阅读 {read_time:.1f} 秒...")
-                await asyncio.sleep(read_time)
+                # 分步滚动到底部（模拟真实阅读）
+                await self._scroll_and_read(tab, config)
 
-                # 滚动页面
-                await tab.evaluate("window.scrollTo(0, document.body.scrollHeight / 2)")
-                await asyncio.sleep(1)
+                # 随机点赞
+                if random.random() < config['like_chance']:
+                    liked = await self._try_like_post(tab)
+                    if liked:
+                        self._likes_given += 1
 
                 browsed_count += 1
             except Exception as e:
                 logger.warning(f"[{self.account_name}] 浏览帖子失败: {e}")
 
-        logger.success(f"[{self.account_name}] 成功浏览 {browsed_count} 个帖子！")
+        logger.success(
+            f"[{self.account_name}] 成功浏览 {browsed_count} 个帖子，"
+            f"点赞 {self._likes_given} 次！"
+        )
         return browsed_count
+
+    async def _scroll_and_read(self, tab, config: dict) -> None:
+        """分步滚动页面，模拟真实阅读行为
+
+        Args:
+            tab: 浏览器标签页
+            config: 浏览配置（包含 scroll_delay, read_time, scroll_steps）
+        """
+        scroll_steps = config['scroll_steps']
+        scroll_delay_min, scroll_delay_max = config['scroll_delay']
+
+        # 获取页面高度
+        page_height = await tab.evaluate("document.body.scrollHeight")
+        viewport_height = await tab.evaluate("window.innerHeight")
+
+        # 计算每步滚动距离
+        total_scroll = max(0, page_height - viewport_height)
+        step_scroll = total_scroll / scroll_steps if scroll_steps > 0 else total_scroll
+
+        current_scroll = 0
+        for step in range(scroll_steps):
+            # 滚动一步
+            current_scroll += step_scroll
+            await tab.evaluate(f"window.scrollTo({{top: {current_scroll}, behavior: 'smooth'}})")
+
+            # 等待 3-5 秒（或根据 level 配置）
+            delay = random.uniform(scroll_delay_min, scroll_delay_max)
+            logger.debug(f"[{self.account_name}]   滚动 {step+1}/{scroll_steps}，等待 {delay:.1f}s...")
+            await asyncio.sleep(delay)
+
+        # 滚动到底部
+        await tab.evaluate("window.scrollTo({top: document.body.scrollHeight, behavior: 'smooth'})")
+
+        # 在底部停留一会儿
+        read_time_min, read_time_max = config['read_time']
+        final_read = random.uniform(read_time_min / 2, read_time_max / 2)
+        logger.debug(f"[{self.account_name}]   底部阅读 {final_read:.1f}s...")
+        await asyncio.sleep(final_read)
+
+    async def _try_like_post(self, tab) -> bool:
+        """尝试给帖子点赞
+
+        Args:
+            tab: 浏览器标签页
+
+        Returns:
+            是否成功点赞
+        """
+        try:
+            # 查找可点赞的按钮（未点赞状态）
+            # Discourse 的点赞按钮通常有 like 相关的 class
+            liked = await tab.evaluate("""
+                (function() {
+                    // 查找第一个帖子的点赞按钮（排除已点赞的）
+                    const likeButtons = document.querySelectorAll(
+                        'button.like:not(.has-like), ' +
+                        'button[class*="like"]:not(.liked):not(.has-like), ' +
+                        '.post-controls button.toggle-like:not(.has-like)'
+                    );
+
+                    // 随机选择一个点赞按钮（如果有多个）
+                    if (likeButtons.length > 0) {
+                        const randomIndex = Math.floor(Math.random() * Math.min(likeButtons.length, 3));
+                        const btn = likeButtons[randomIndex];
+                        if (btn && !btn.disabled) {
+                            btn.click();
+                            return true;
+                        }
+                    }
+                    return false;
+                })()
+            """)
+
+            if liked:
+                logger.debug(f"[{self.account_name}]   👍 点赞成功")
+                await asyncio.sleep(random.uniform(0.5, 1.5))  # 点赞后短暂等待
+                return True
+
+        except Exception as e:
+            logger.debug(f"[{self.account_name}]   点赞失败: {e}")
+
+        return False
 
     def _get_topics(self) -> list:
         """获取帖子列表"""

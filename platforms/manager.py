@@ -81,11 +81,17 @@ class PlatformManager:
                 continue
 
             logger.info(f"开始执行 LinuxDO 浏览: {account.get_display_name(i)}")
+            
+            # 从 level 计算浏览数量：L1=多看(10个), L2=一般(7个), L3=快速(5个)
+            # 但如果用户指定了 browse_count，优先使用用户的设置
+            level = getattr(account, 'level', 2) if hasattr(account, 'level') else 2
+            
             adapter = LinuxDOAdapter(
                 username=account.username,
                 password=account.password,
                 browse_count=account.browse_count,
                 account_name=account.get_display_name(i),
+                level=level,
             )
 
             try:
@@ -277,12 +283,18 @@ class PlatformManager:
         return ""
 
     async def _get_waf_cookies(self, provider, account_name: str) -> dict | None:
-        """使用 Patchright 浏览器获取 WAF cookies"""
+        """使用 Playwright 浏览器获取 WAF cookies（参考 anyrouter-check-in 实现）"""
+        # 优先使用 patchright，回退到 playwright
         try:
             from patchright.async_api import async_playwright
+            logger.debug(f"[{account_name}] 使用 Patchright 浏览器")
         except ImportError:
-            logger.warning(f"[{account_name}] Patchright 未安装，跳过 WAF bypass")
-            return None
+            try:
+                from playwright.async_api import async_playwright
+                logger.debug(f"[{account_name}] 使用 Playwright 浏览器")
+            except ImportError:
+                logger.warning(f"[{account_name}] Patchright/Playwright 未安装，跳过 WAF bypass")
+                return None
 
         logger.info(f"[{account_name}] 启动浏览器获取 WAF cookies...")
         required_cookies = provider.waf_cookie_names or []
@@ -291,19 +303,23 @@ class PlatformManager:
         try:
             async with async_playwright() as p:
                 with tempfile.TemporaryDirectory() as temp_dir:
+                    # 参考 anyrouter-check-in 的配置：headless=False 更不容易被检测
                     context = await p.chromium.launch_persistent_context(
                         user_data_dir=temp_dir,
-                        headless=True,
-                        user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/138.0.0.0 Safari/537.36",
+                        headless=False,  # 非 headless 模式更不容易被 WAF 检测
+                        user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36",
                         viewport={"width": 1920, "height": 1080},
                         args=[
                             "--disable-blink-features=AutomationControlled",
                             "--disable-dev-shm-usage",
+                            "--disable-web-security",
+                            "--disable-features=VizDisplayCompositor",
                             "--no-sandbox",
                         ],
                     )
 
                     page = await context.new_page()
+                    logger.debug(f"[{account_name}] 访问登录页面: {login_url}")
                     await page.goto(login_url, wait_until="networkidle", timeout=30000)
 
                     # 等待页面加载完成
@@ -316,16 +332,23 @@ class PlatformManager:
                     cookies = await page.context.cookies()
                     waf_cookies = {}
                     for cookie in cookies:
-                        if cookie.get("name") in required_cookies:
-                            waf_cookies[cookie["name"]] = cookie["value"]
+                        cookie_name = cookie.get("name")
+                        cookie_value = cookie.get("value")
+                        if cookie_name in required_cookies and cookie_value:
+                            waf_cookies[cookie_name] = cookie_value
 
                     await context.close()
 
+                    # 检查是否获取到所有需要的 cookies
+                    missing_cookies = [c for c in required_cookies if c not in waf_cookies]
+                    if missing_cookies:
+                        logger.warning(f"[{account_name}] 缺少 WAF cookies: {missing_cookies}")
+
                     if waf_cookies:
-                        logger.success(f"[{account_name}] 获取到 {len(waf_cookies)} 个 WAF cookies")
+                        logger.success(f"[{account_name}] 获取到 {len(waf_cookies)} 个 WAF cookies: {list(waf_cookies.keys())}")
                         return waf_cookies
                     else:
-                        logger.warning(f"[{account_name}] 未获取到 WAF cookies")
+                        logger.warning(f"[{account_name}] 未获取到任何 WAF cookies")
                         return None
 
         except Exception as e:
