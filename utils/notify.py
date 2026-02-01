@@ -16,12 +16,12 @@ Requirements:
 import os
 import re
 import smtplib
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from email.header import Header
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.utils import formataddr
-from typing import Literal, Optional
+from typing import Literal
 
 import httpx
 from loguru import logger
@@ -51,7 +51,7 @@ class NotificationManager:
     - 企业微信: 企业微信机器人
     - Bark: iOS 推送服务
     """
-    
+
     def __init__(self):
         """初始化通知管理器，从环境变量加载所有渠道配置"""
         # Email 配置
@@ -60,66 +60,66 @@ class NotificationManager:
         self.email_to = os.getenv("EMAIL_TO")
         self.email_sender = os.getenv("EMAIL_SENDER")
         self.smtp_server = os.getenv("CUSTOM_SMTP_SERVER")
-        
+
         # Gotify 配置
         self.gotify_url = os.getenv("GOTIFY_URL")
         self.gotify_token = os.getenv("GOTIFY_TOKEN")
         gotify_priority_str = os.getenv("GOTIFY_PRIORITY") or "9"
         self.gotify_priority = int(gotify_priority_str) if gotify_priority_str else 9
-        
+
         # Server酱³ 配置
         self.sc3_push_key = os.getenv("SC3_PUSH_KEY")
-        
+
         # wxpush 配置
         self.wxpush_url = os.getenv("WXPUSH_URL")
         self.wxpush_token = os.getenv("WXPUSH_TOKEN")
-        
+
         # Telegram 配置
         self.telegram_bot_token = os.getenv("TELEGRAM_BOT_TOKEN") or os.getenv("TELEGRAM_TOKEN")
         self.telegram_chat_id = os.getenv("TELEGRAM_CHAT_ID") or os.getenv("TELEGRAM_USERID")
-        
+
         # PushPlus 配置
         self.pushplus_token = os.getenv("PUSHPLUS_TOKEN")
-        
+
         # Server酱 (旧版) 配置
         self.server_push_key = os.getenv("SERVERPUSHKEY")
-        
+
         # 钉钉配置
         self.dingding_webhook = os.getenv("DINGDING_WEBHOOK")
-        
+
         # 飞书配置
         self.feishu_webhook = os.getenv("FEISHU_WEBHOOK")
-        
+
         # 企业微信配置
         self.weixin_webhook = os.getenv("WEIXIN_WEBHOOK")
-        
+
         # Bark 配置
         self.bark_key = os.getenv("BARK_KEY")
         self.bark_server = os.getenv("BARK_SERVER", "https://api.day.app")
-        
+
         # HTTP 客户端
-        self._client: Optional[httpx.Client] = None
-    
+        self._client: httpx.Client | None = None
+
     @property
     def client(self) -> httpx.Client:
         """获取 HTTP 客户端（懒加载）"""
         if self._client is None:
             self._client = httpx.Client(timeout=30.0)
         return self._client
-    
+
     def close(self):
         """关闭 HTTP 客户端"""
         if self._client is not None:
             self._client.close()
             self._client = None
-    
+
     def __enter__(self):
         return self
-    
+
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.close()
         return False
-    
+
     def push_message(
         self,
         title: str,
@@ -149,9 +149,9 @@ class NotificationManager:
             ("企业微信", self._send_wecom),
             ("Bark", self._send_bark),
         ]
-        
+
         results: dict[str, bool] = {}
-        
+
         for name, func in channels:
             try:
                 func(title, content, msg_type)
@@ -163,9 +163,9 @@ class NotificationManager:
             except Exception as e:
                 logger.error(f"[{name}] 推送失败: {e}")
                 results[name] = False
-        
+
         return results
-    
+
     def _send_email(
         self,
         title: str,
@@ -183,13 +183,13 @@ class NotificationManager:
         """
         if not self.email_user or not self.email_pass or not self.email_to:
             raise ValueError("Email 配置不完整")
-        
+
         # 发件人显示名称
         sender_name = self.email_sender if self.email_sender else "Github自动签到"
-        
+
         # 创建邮件 - 使用 MIMEMultipart 确保兼容性
         msg = MIMEMultipart("alternative")
-        
+
         # 添加纯文本备用内容（用于不支持HTML的客户端）
         if msg_type == "html":
             # 简单的纯文本版本
@@ -198,23 +198,23 @@ class NotificationManager:
             msg.attach(MIMEText(content, "html", "utf-8"))
         else:
             msg.attach(MIMEText(content, "plain", "utf-8"))
-        
+
         # 使用 formataddr + Header 正确编码中文发件人名称 (RFC5322 兼容)
         msg["From"] = formataddr((Header(sender_name, "utf-8").encode(), self.email_user))
         msg["To"] = self.email_to
         msg["Subject"] = Header(title, "utf-8")
-        
+
         # 确定 SMTP 服务器
         smtp_server = self.smtp_server
         if not smtp_server:
             domain = self.email_user.split("@")[1]
             smtp_server = f"smtp.{domain}"
-        
+
         # 发送邮件
         with smtplib.SMTP_SSL(smtp_server, 465) as server:
             server.login(self.email_user, self.email_pass)
             server.sendmail(self.email_user, [self.email_to], msg.as_string())
-    
+
     def _send_gotify(
         self,
         title: str,
@@ -230,14 +230,14 @@ class NotificationManager:
         """
         if not self.gotify_url or not self.gotify_token:
             raise ValueError("Gotify 配置不完整")
-        
+
         url = f"{self.gotify_url.rstrip('/')}/message"
-        
+
         # Gotify 支持 markdown 格式
         extras = {}
         if msg_type == "html":
             extras = {"client::display": {"contentType": "text/html"}}
-        
+
         payload = {
             "title": title,
             "message": content,
@@ -245,14 +245,14 @@ class NotificationManager:
         }
         if extras:
             payload["extras"] = extras
-        
+
         response = self.client.post(
             url,
             params={"token": self.gotify_token},
             json=payload,
         )
         response.raise_for_status()
-    
+
     def _send_sc3(
         self,
         title: str,
@@ -268,18 +268,18 @@ class NotificationManager:
         """
         if not self.sc3_push_key:
             raise ValueError("Server酱 配置不完整")
-        
+
         # Server酱 Turbo API
         url = f"https://sctapi.ftqq.com/{self.sc3_push_key}.send"
-        
+
         payload = {
             "title": title[:32],  # 标题最大32字符
             "desp": content,
         }
-        
+
         response = self.client.post(url, data=payload)
         response.raise_for_status()
-    
+
     def _send_wxpush(
         self,
         title: str,
@@ -294,9 +294,9 @@ class NotificationManager:
         """
         if not self.wxpush_url or not self.wxpush_token:
             raise ValueError("wxpush 配置不完整")
-        
+
         url = f"{self.wxpush_url.rstrip('/')}/wxsend"
-        
+
         response = self.client.post(
             url,
             headers={
@@ -309,7 +309,7 @@ class NotificationManager:
             },
         )
         response.raise_for_status()
-    
+
     def _send_telegram(
         self,
         title: str,
@@ -324,21 +324,21 @@ class NotificationManager:
         """
         if not self.telegram_bot_token or not self.telegram_chat_id:
             raise ValueError("Telegram 配置不完整")
-        
+
         url = f"https://api.telegram.org/bot{self.telegram_bot_token}/sendMessage"
-        
+
         # 组合标题和内容
         text = f"*{title}*\n\n{content}" if msg_type == "text" else f"<b>{title}</b>\n\n{content}"
-        
+
         payload = {
             "chat_id": self.telegram_chat_id,
             "text": text,
             "parse_mode": "HTML" if msg_type == "html" else "Markdown",
         }
-        
+
         response = self.client.post(url, json=payload)
         response.raise_for_status()
-    
+
     def _send_pushplus(
         self,
         title: str,
@@ -352,19 +352,19 @@ class NotificationManager:
         """
         if not self.pushplus_token:
             raise ValueError("PushPlus 配置不完整")
-        
+
         url = "https://www.pushplus.plus/send"
-        
+
         payload = {
             "token": self.pushplus_token,
             "title": title,
             "content": content,
             "template": "html" if msg_type == "html" else "txt",
         }
-        
+
         response = self.client.post(url, json=payload)
         response.raise_for_status()
-    
+
     def _send_server_push(
         self,
         title: str,
@@ -378,17 +378,17 @@ class NotificationManager:
         """
         if not self.server_push_key:
             raise ValueError("Server酱 配置不完整")
-        
+
         url = f"https://sctapi.ftqq.com/{self.server_push_key}.send"
-        
+
         payload = {
             "title": title,
             "desp": content,
         }
-        
+
         response = self.client.post(url, data=payload)
         response.raise_for_status()
-    
+
     def _send_dingtalk(
         self,
         title: str,
@@ -402,7 +402,7 @@ class NotificationManager:
         """
         if not self.dingding_webhook:
             raise ValueError("钉钉 配置不完整")
-        
+
         # 钉钉支持 markdown 格式
         if msg_type == "html":
             payload = {
@@ -419,10 +419,10 @@ class NotificationManager:
                     "content": f"{title}\n\n{content}",
                 },
             }
-        
+
         response = self.client.post(self.dingding_webhook, json=payload)
         response.raise_for_status()
-    
+
     def _send_feishu(
         self,
         title: str,
@@ -436,7 +436,7 @@ class NotificationManager:
         """
         if not self.feishu_webhook:
             raise ValueError("飞书 配置不完整")
-        
+
         # 飞书支持富文本格式
         if msg_type == "html":
             payload = {
@@ -457,10 +457,10 @@ class NotificationManager:
                     "text": f"{title}\n\n{content}",
                 },
             }
-        
+
         response = self.client.post(self.feishu_webhook, json=payload)
         response.raise_for_status()
-    
+
     def _send_wecom(
         self,
         title: str,
@@ -474,7 +474,7 @@ class NotificationManager:
         """
         if not self.weixin_webhook:
             raise ValueError("企业微信 配置不完整")
-        
+
         # 企业微信支持 markdown 格式
         if msg_type == "html":
             payload = {
@@ -490,10 +490,10 @@ class NotificationManager:
                     "content": f"{title}\n\n{content}",
                 },
             }
-        
+
         response = self.client.post(self.weixin_webhook, json=payload)
         response.raise_for_status()
-    
+
     def _send_bark(
         self,
         title: str,
@@ -508,30 +508,30 @@ class NotificationManager:
         """
         if not self.bark_key:
             raise ValueError("Bark 配置不完整")
-        
+
         server = self.bark_server.rstrip("/")
         url = f"{server}/{self.bark_key}"
-        
+
         payload = {
             "title": title,
             "body": content,
         }
-        
+
         # Bark 支持 HTML 格式（通过 isArchive 参数）
         if msg_type == "html":
             payload["isArchive"] = 1
-        
+
         response = self.client.post(url, json=payload)
         response.raise_for_status()
-    
+
     @staticmethod
     def format_checkin_message(
         platform: str,
         account: str,
         status: str,
         message: str,
-        details: Optional[dict] = None,
-        timestamp: Optional[datetime] = None
+        details: dict | None = None,
+        timestamp: datetime | None = None
     ) -> tuple[str, str]:
         """格式化签到结果消息
         
@@ -548,7 +548,7 @@ class NotificationManager:
         """
         if timestamp is None:
             timestamp = get_beijing_time()
-        
+
         # 状态图标
         status_icons = {
             "success": "✅",
@@ -556,10 +556,10 @@ class NotificationManager:
             "skipped": "⏭️",
         }
         icon = status_icons.get(status, "ℹ️")
-        
+
         # 标题
         title = f"{icon} {platform} 签到结果"
-        
+
         # 内容
         lines = [
             f"平台: {platform}",
@@ -568,7 +568,7 @@ class NotificationManager:
             f"消息: {message}",
             f"时间: {timestamp.strftime('%Y-%m-%d %H:%M:%S')}",
         ]
-        
+
         # 添加余额信息（如果有）
         if details:
             if "balance" in details:
@@ -581,11 +581,11 @@ class NotificationManager:
             for key, value in details.items():
                 if key not in ("balance", "balance_change"):
                     lines.append(f"{key}: {value}")
-        
+
         content = "\n".join(lines)
-        
+
         return title, content
-    
+
     @staticmethod
     def _extract_provider_name(platform: str) -> str:
         """从 platform 字段提取 provider 名称
@@ -603,7 +603,7 @@ class NotificationManager:
     @staticmethod
     def format_summary_message(
         results: list[dict],
-        timestamp: Optional[datetime] = None
+        timestamp: datetime | None = None
     ) -> tuple[str, str, str]:
         """格式化签到汇总消息 - Apple 风格简洁设计
         
@@ -618,15 +618,15 @@ class NotificationManager:
         """
         if timestamp is None:
             timestamp = get_beijing_time()
-        
+
         success_count = sum(1 for r in results if r.get("status") == "success")
         failed_count = sum(1 for r in results if r.get("status") == "failed")
         total_count = len(results)
-        
+
         # 动态按 provider 分组
         provider_groups: dict[str, list[dict]] = {}
         linuxdo_results = []
-        
+
         for r in results:
             platform = r.get("platform", "")
             if "LinuxDO" in platform:
@@ -636,12 +636,12 @@ class NotificationManager:
                 if provider not in provider_groups:
                     provider_groups[provider] = []
                 provider_groups[provider].append(r)
-        
+
         # 生成标题
         provider_names = list(provider_groups.keys())
         if linuxdo_results:
             provider_names.append("LinuxDO")
-        
+
         if provider_names:
             # 最多显示3个，超过用 "等X站"
             if len(provider_names) <= 3:
@@ -650,7 +650,7 @@ class NotificationManager:
                 platform_name = f"{'+'.join(provider_names[:2])}等{len(provider_names)}站"
         else:
             platform_name = "签到"
-        
+
         if failed_count == 0:
             title = f"✅ {platform_name}签到完成"
             status_icon = "✓"
@@ -659,10 +659,10 @@ class NotificationManager:
             title = f"⚠️ {platform_name}签到完成"
             status_icon = "!"
             status_bg = "#FF9500"  # Apple Orange for partial success
-        
+
         # 纯文本内容
         lines = [f"[时间] {timestamp.strftime('%Y-%m-%d %H:%M:%S')}", ""]
-        
+
         # Apple 风格 HTML - 极简、大留白、圆角、系统字体
         html_parts = [f'''
 <!DOCTYPE html>
@@ -683,7 +683,7 @@ class NotificationManager:
         <p style="margin: 8px 0 0 0; font-size: 15px; color: #86868B;">{timestamp.strftime('%Y年%m月%d日 %H:%M')}</p>
     </div>
 ''']
-        
+
         # 动态生成每个 provider 的卡片
         for provider_name, provider_results in provider_groups.items():
             # 为每个 provider 生成卡片
@@ -696,15 +696,15 @@ class NotificationManager:
             <span style="font-size: 17px; font-weight: 600; color: #1D1D1F;">{display_name}</span>
         </div>
 ''')
-            
+
             for i, result in enumerate(provider_results):
                 details = result.get("details") or {}
                 account = result.get("account", "Unknown")
                 status = result.get("status", "unknown")
-                
+
                 if i > 0:
                     html_parts.append('<div style="height: 1px; background: #F5F5F7; margin: 16px 0;"></div>')
-                
+
                 if status == "success":
                     balance = details.get("balance", "N/A")
                     used = details.get("used", "N/A")
@@ -731,10 +731,10 @@ class NotificationManager:
             <div style="font-size: 13px; color: #86868B; margin-bottom: 6px;">{account}</div>
             <div style="font-size: 15px; color: #FF3B30;">❌ {msg}</div>
         </div>''')
-            
+
             html_parts.append('    </div>')
             lines.append("")
-        
+
         # LinuxDO 签到卡片
         if linuxdo_results:
             html_parts.append('''
@@ -745,15 +745,15 @@ class NotificationManager:
             <span style="font-size: 17px; font-weight: 600; color: #1D1D1F;">LinuxDO</span>
         </div>
 ''')
-            
+
             for i, result in enumerate(linuxdo_results):
                 account = result.get("account", "Unknown")
                 status = result.get("status", "unknown")
                 message = result.get("message", "")
-                
+
                 if i > 0:
                     html_parts.append('<div style="height: 1px; background: #F5F5F7; margin: 16px 0;"></div>')
-                
+
                 if status == "success":
                     lines.append(f"[LinuxDO] {account}: {message}")
                     html_parts.append(f'''
@@ -778,10 +778,10 @@ class NotificationManager:
                 <span style="color: white; font-size: 16px;">✗</span>
             </div>
         </div>''')
-            
+
             html_parts.append('</div>')
             lines.append("")
-        
+
         # 热门话题卡片
         for result in linuxdo_results:
             details = result.get("details") or {}
@@ -796,26 +796,26 @@ class NotificationManager:
             <span style="font-size: 17px; font-weight: 600; color: #1D1D1F;">热门话题</span>
         </div>
 ''')
-                
+
                 for i, topic in enumerate(hot_topics[:8], 1):
                     topic_title = topic.get("title", "")
                     views = topic.get("views", 0)
                     replies = topic.get("replies", 0)
                     url = topic.get("url", "")
-                    
+
                     if views >= 10000:
                         views_str = f"{views/10000:.1f}万"
                     elif views >= 1000:
                         views_str = f"{views/1000:.1f}k"
                     else:
                         views_str = str(views)
-                    
+
                     lines.append(f"  {i}. {topic_title}")
                     lines.append(f"     👁 {views_str} | 💬 {replies}")
-                    
+
                     if i > 1:
                         html_parts.append('<div style="height: 1px; background: #F5F5F7; margin: 12px 0;"></div>')
-                    
+
                     html_parts.append(f'''
         <a href="{url}" style="text-decoration: none; display: block;">
             <div style="display: flex; align-items: flex-start; gap: 12px;">
@@ -829,14 +829,14 @@ class NotificationManager:
                 </div>
             </div>
         </a>''')
-                
+
                 html_parts.append('</div>')
                 lines.append("")
                 break
-        
+
         # 底部统计
         lines.append(f"[统计] 成功: {success_count}/{total_count}, 失败: {failed_count}/{total_count}")
-        
+
         html_parts.append(f'''
     <!-- 底部统计 -->
     <div style="text-align: center; padding: 24px 0 8px 0;">
@@ -856,10 +856,10 @@ class NotificationManager:
 </body>
 </html>
 ''')
-        
+
         text_content = "\n".join(lines)
         html_content = "".join(html_parts)
-        
+
         return title, text_content, html_content
 
 
