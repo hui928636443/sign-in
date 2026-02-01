@@ -676,13 +676,21 @@ class BrowserManager:
 
         # Requirement 8.4: 提供清晰的错误消息
         # 尝试启动浏览器，捕获并提供有用的错误信息
+        # 使用 Config 对象进行配置，确保 sandbox 设置生效
         try:
-            self._nodriver_browser = await uc.start(
-                headless=use_headless,
-                sandbox=use_sandbox,
-                browser_args=browser_args,
-                user_data_dir=self.user_data_dir,
+            config = uc.Config()
+            config.headless = use_headless
+            config.sandbox = use_sandbox
+            config.browser_args = browser_args
+            if self.user_data_dir:
+                config.user_data_dir = self.user_data_dir
+
+            logger.info(
+                f"nodriver 配置: headless={config.headless}, "
+                f"sandbox={config.sandbox}, args={len(browser_args)}"
             )
+
+            self._nodriver_browser = await uc.start(config=config)
         except Exception as e:
             # 构建详细的环境信息用于调试
             env_info = self._build_environment_info(
