@@ -44,8 +44,8 @@ class PlatformManager:
         self._load_linuxdo_accounts()
 
     def _load_linuxdo_accounts(self) -> None:
-        """加载 LinuxDO 账户用于浏览器回退登录"""
-        # 从配置中获取 LinuxDO 账户
+        """加载 LinuxDO 账户用于浏览器回退登录（不用于浏览帖子）"""
+        # 从配置中获取 LinuxDO 账户，仅用于 OAuth 登录
         if self.config.linuxdo_accounts:
             for acc in self.config.linuxdo_accounts:
                 self._linuxdo_accounts.append({

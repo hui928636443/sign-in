@@ -123,10 +123,11 @@ jobs:
           BARK_SERVER: ${{ secrets.BARK_SERVER }}
         run: |
           # 使用 xvfb-run 启动，模拟显示器绕过 Cloudflare headless 检测
+          # 只运行 newapi 签到，不运行 LinuxDO 浏览（浏览帖子用 linuxdo-browse.yml）
           if [ -n "${{ github.event.inputs.platform }}" ]; then
             xvfb-run --server-args="-screen 0 1920x1080x24" uv run python main.py --platform ${{ github.event.inputs.platform }}
           else
-            xvfb-run --server-args="-screen 0 1920x1080x24" uv run python main.py
+            xvfb-run --server-args="-screen 0 1920x1080x24" uv run python main.py --platform newapi
           fi
 
 
