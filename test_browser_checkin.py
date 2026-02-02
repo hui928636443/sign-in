@@ -23,14 +23,14 @@ from loguru import logger
 from platforms.newapi_browser import browser_checkin_newapi, load_linuxdo_accounts
 
 # 测试配置
-TEST_PROVIDER = "hotaru"  # 要签到的站点：hotaru 或 lightllm
+TEST_PROVIDER = "techstar"  # 要签到的站点：hotaru, lightllm, anyrouter, techstar 等
 
 # 从 签到账户newAPI.json 中获取 hotaru 的 cookie 和 api_user（可选）
 # 使用无效 cookie 测试 OAuth 回退
 TEST_COOKIES = {
     "session": "invalid_session_to_test_oauth"
 }
-TEST_API_USER = "7340"
+TEST_API_USER = "2555"
 
 
 async def main():

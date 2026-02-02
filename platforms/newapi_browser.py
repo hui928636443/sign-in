@@ -417,6 +417,78 @@ class NewAPIBrowserCheckin:
             except Exception as e:
                 logger.debug(f"[{self.account_name}] 获取页面信息失败: {e}")
 
+        # 先检查并勾选用户协议复选框（某些站点如 techstar 使用 Semi Design UI）
+        try:
+            checkbox_result = await tab.evaluate(r"""
+                (function() {
+                    // 策略1: 查找 Semi Design 的 checkbox 组件（.semi-checkbox）
+                    const semiCheckboxes = document.querySelectorAll('.semi-checkbox');
+                    for (const cb of semiCheckboxes) {
+                        const text = (cb.innerText || cb.textContent || '').toLowerCase();
+                        const parentText = (cb.parentElement?.innerText || '').toLowerCase();
+                        const combinedText = text + ' ' + parentText;
+                        
+                        // 匹配用户协议、隐私政策等关键词
+                        if (combinedText.includes('协议') || combinedText.includes('政策') || 
+                            combinedText.includes('同意') || combinedText.includes('阅读') ||
+                            combinedText.includes('agree') || combinedText.includes('terms') ||
+                            combinedText.includes('policy') || combinedText.includes('privacy')) {
+                            // 检查是否已勾选（Semi Design 使用 .semi-checkbox-checked 类）
+                            if (!cb.classList.contains('semi-checkbox-checked')) {
+                                cb.click();
+                                return 'semi-checkbox clicked: ' + text.substring(0, 50);
+                            }
+                            return 'semi-checkbox already checked';
+                        }
+                    }
+                    
+                    // 策略2: 查找标准的 input[type="checkbox"]
+                    const checkboxes = document.querySelectorAll('input[type="checkbox"]');
+                    for (const cb of checkboxes) {
+                        const label = cb.closest('label') || document.querySelector(`label[for="${cb.id}"]`);
+                        const parent = cb.parentElement;
+                        const text = (label?.innerText || parent?.innerText || '').toLowerCase();
+                        
+                        if (text.includes('协议') || text.includes('政策') || 
+                            text.includes('同意') || text.includes('阅读') ||
+                            text.includes('agree') || text.includes('terms') ||
+                            text.includes('policy') || text.includes('privacy')) {
+                            if (!cb.checked) {
+                                cb.click();
+                                return 'input-checkbox clicked: ' + text.substring(0, 50);
+                            }
+                            return 'input-checkbox already checked';
+                        }
+                    }
+                    
+                    // 策略3: 查找包含协议文字的可点击区域（div/span/label）
+                    const clickables = document.querySelectorAll('div, span, label');
+                    for (const el of clickables) {
+                        const text = (el.innerText || '').toLowerCase();
+                        // 精确匹配"我已阅读并同意"这类文字
+                        if ((text.includes('我已阅读') || text.includes('i have read')) && 
+                            (text.includes('同意') || text.includes('agree'))) {
+                            // 查找内部的 checkbox 或直接点击
+                            const innerCb = el.querySelector('input[type="checkbox"], .semi-checkbox');
+                            if (innerCb) {
+                                innerCb.click();
+                                return 'inner-checkbox clicked';
+                            }
+                            // 如果没有内部 checkbox，点击整个区域
+                            el.click();
+                            return 'agreement-area clicked: ' + text.substring(0, 50);
+                        }
+                    }
+                    
+                    return null;
+                })()
+            """)
+            if checkbox_result:
+                logger.info(f"[{self.account_name}] 用户协议复选框: {checkbox_result}")
+                await asyncio.sleep(1)  # 等待 UI 更新
+        except Exception as e:
+            logger.debug(f"[{self.account_name}] 检查用户协议复选框失败: {e}")
+
         # 点击 LinuxDO OAuth 按钮（使用多种匹配策略）
         clicked = False
         for attempt in range(5):
