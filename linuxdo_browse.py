@@ -53,7 +53,7 @@ async def main():
     try:
         from platforms.linuxdo import LinuxDOAdapter
         from utils.config import AppConfig
-        from utils.notify import send_notification
+        from utils.notify import push_message
 
         logger.info("模块导入成功")
     except ImportError as e:
@@ -143,7 +143,7 @@ async def main():
         logger.info(f"发送通知:\n{content}")
 
         try:
-            await send_notification(title, content)
+            push_message(title, content)
             logger.success("通知发送成功")
         except Exception as e:
             logger.warning(f"通知发送失败: {e}")
