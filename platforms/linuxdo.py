@@ -231,20 +231,35 @@ class LinuxDOAdapter(BasePlatformAdapter):
             return False
 
     async def _login_via_browser(self) -> bool:
-        """通过浏览器登录 LinuxDO"""
+        """通过浏览器登录 LinuxDO
+
+        使用 nodriver（最强反检测），在 CI 环境中增加重试次数。
+        配合 Xvfb 使用非 headless 模式以绕过 Cloudflare 检测。
+        """
         import os
+
         engine = get_browser_engine()
         logger.info(f"[{self.account_name}] 使用浏览器引擎: {engine}")
 
+        # CI 环境检测
+        is_ci = bool(os.environ.get("CI")) or bool(os.environ.get("GITHUB_ACTIONS"))
+        display_set = bool(os.environ.get("DISPLAY"))
+
         # 支持通过环境变量控制 headless 模式（用于调试）
         headless = os.environ.get("BROWSER_HEADLESS", "true").lower() != "false"
-        self._browser_manager = BrowserManager(engine=engine, headless=headless)
-        await self._browser_manager.start()
 
-        # 获取实际使用的引擎（可能因为 CI 环境回退而改变）
+        # 在 CI 环境中，如果有 Xvfb（DISPLAY 已设置），优先使用非 headless 模式
+        if is_ci and display_set:
+            headless = False
+            logger.info(f"[{self.account_name}] CI 环境检测到 DISPLAY={os.environ.get('DISPLAY')}，使用非 headless 模式")
+
+        # CI 环境中 nodriver 启动不稳定，增加重试次数到 5 次
+        max_retries = 5 if is_ci else 3
+        self._browser_manager = BrowserManager(engine=engine, headless=headless)
+        await self._browser_manager.start(max_retries=max_retries)
+
+        # 获取实际使用的引擎
         actual_engine = self._browser_manager.engine
-        if actual_engine != engine:
-            logger.info(f"[{self.account_name}] 引擎已回退: {engine} -> {actual_engine}")
 
         try:
             if actual_engine == "nodriver":
@@ -675,10 +690,15 @@ class LinuxDOAdapter(BasePlatformAdapter):
         """使用浏览器直接浏览帖子（更真实的浏览行为）
 
         浏览行为：
-        - 每次滑动间隔 3-5 秒
-        - 每个帖子滑动到底部
-        - 随机给几个赞
-        - Level 影响浏览时间：L1 多看，L2 一般，L3 快速
+        - 尽量把每个帖子都看完（滚动到底部）
+        - 每次滚动间隔 5-8 秒，模拟真实阅读
+        - 偶尔回滚模拟回看行为
+        - 过程中随机点赞（30% 概率）
+        - Level 影响总浏览时长：
+          - L1: 60 分钟（需要多刷时间的账号）
+          - L2: 30 分钟（正常账号）
+          - L3: 15 分钟（快速浏览）
+        - 按时间控制浏览，而不是按帖子数量
 
         Returns:
             成功浏览的帖子数量
@@ -686,132 +706,207 @@ class LinuxDOAdapter(BasePlatformAdapter):
         tab = self._browser_manager.page
         browsed_count = 0
 
-        # 根据 level 设置浏览参数
-        # L1: 慢速浏览（多看）, L2: 正常浏览, L3: 快速浏览
-        level_config = {
-            1: {"scroll_delay": (4, 6), "read_time": (8, 15), "like_chance": 0.4, "scroll_steps": 4},
-            2: {"scroll_delay": (3, 5), "read_time": (5, 10), "like_chance": 0.3, "scroll_steps": 3},
-            3: {"scroll_delay": (2, 4), "read_time": (3, 6), "like_chance": 0.2, "scroll_steps": 2},
+        # 根据 level 设置总浏览时长（分钟）
+        level_duration = {
+            1: 60,  # L1: 1 小时
+            2: 30,  # L2: 30 分钟
+            3: 15,  # L3: 15 分钟
         }
-        config = level_config.get(self.level, level_config[2])
+        total_minutes = level_duration.get(self.level, 30)
+        total_seconds = total_minutes * 60
 
-        logger.info(f"[{self.account_name}] 浏览模式: L{self.level} (滑动间隔: {config['scroll_delay']}s)")
+        # 浏览配置 - 模拟真实用户行为
+        config = {
+            "scroll_delay": (5, 8),   # 每次滚动间隔 5-8 秒
+            "like_chance": 0.3,       # 30% 概率点赞
+            "scroll_back_chance": 0.2,  # 20% 概率回滚（模拟回看）
+        }
 
-        # 访问最新帖子页面
-        logger.info(f"[{self.account_name}] 访问最新帖子页面...")
-        await tab.get(f"{self.BASE_URL}/latest")
-        await asyncio.sleep(5)
+        logger.info(
+            f"[{self.account_name}] 浏览模式: L{self.level} "
+            f"(总时长: {total_minutes} 分钟, 滚动间隔: {config['scroll_delay'][0]}-{config['scroll_delay'][1]}s)"
+        )
 
-        # 等待帖子列表加载
-        for _ in range(10):
-            has_topics = await tab.evaluate("document.querySelectorAll('a.title').length > 0")
-            if has_topics:
-                break
-            await asyncio.sleep(1)
+        # 记录开始时间
+        start_time = time.time()
+        end_time = start_time + total_seconds
 
-        # 获取帖子链接
-        topic_links_json = await tab.evaluate("""
-            (function() {
-                const links = document.querySelectorAll('a.title.raw-link, a.title[href*="/t/"]');
-                const result = [];
-                for (let i = 0; i < Math.min(links.length, 20); i++) {
-                    const a = links[i];
-                    if (a.href && a.href.includes('/t/')) {
-                        result.push({
-                            href: a.href,
-                            title: (a.innerText || a.textContent || '').trim().substring(0, 50)
-                        });
+        # 已浏览的帖子 URL 集合（避免重复）
+        browsed_urls = set()
+
+        while time.time() < end_time:
+            # 计算剩余时间
+            remaining = int(end_time - time.time())
+            remaining_min = remaining // 60
+            remaining_sec = remaining % 60
+
+            logger.info(
+                f"[{self.account_name}] 剩余时间: {remaining_min}分{remaining_sec}秒, "
+                f"已浏览: {browsed_count} 个帖子"
+            )
+
+            # 访问最新帖子页面获取新帖子
+            logger.info(f"[{self.account_name}] 访问最新帖子页面...")
+            await tab.get(f"{self.BASE_URL}/latest")
+            await asyncio.sleep(5)
+
+            # 等待帖子列表加载
+            for _ in range(10):
+                has_topics = await tab.evaluate("document.querySelectorAll('a.title').length > 0")
+                if has_topics:
+                    break
+                await asyncio.sleep(1)
+
+            # 获取帖子链接
+            topic_links_json = await tab.evaluate("""
+                (function() {
+                    const links = document.querySelectorAll('a.title.raw-link, a.title[href*="/t/"]');
+                    const result = [];
+                    for (let i = 0; i < Math.min(links.length, 30); i++) {
+                        const a = links[i];
+                        if (a.href && a.href.includes('/t/')) {
+                            result.push({
+                                href: a.href,
+                                title: (a.innerText || a.textContent || '').trim().substring(0, 50)
+                            });
+                        }
                     }
-                }
-                return JSON.stringify(result);
-            })()
-        """)
+                    return JSON.stringify(result);
+                })()
+            """)
 
-        # 解析 JSON 结果
-        topic_links = []
-        if topic_links_json and isinstance(topic_links_json, str):
-            try:
-                topic_links = json.loads(topic_links_json)
-            except json.JSONDecodeError:
-                logger.warning(f"[{self.account_name}] JSON 解析失败")
-        elif isinstance(topic_links_json, list):
-            topic_links = topic_links_json
+            # 解析 JSON 结果
+            topic_links = []
+            if topic_links_json and isinstance(topic_links_json, str):
+                try:
+                    topic_links = json.loads(topic_links_json)
+                except json.JSONDecodeError:
+                    logger.warning(f"[{self.account_name}] JSON 解析失败")
+            elif isinstance(topic_links_json, list):
+                topic_links = topic_links_json
 
-        if not topic_links:
-            logger.warning(f"[{self.account_name}] 未获取到帖子列表")
-            return 0
+            if not topic_links:
+                logger.warning(f"[{self.account_name}] 未获取到帖子列表，等待后重试...")
+                await asyncio.sleep(10)
+                continue
 
-        logger.info(f"[{self.account_name}] 找到 {len(topic_links)} 个帖子")
+            # 过滤掉已浏览的帖子
+            new_topics = [t for t in topic_links if t.get('href') not in browsed_urls]
 
-        # 随机选择帖子浏览
-        browse_count = min(self.browse_count, len(topic_links))
-        selected = random.sample(topic_links, browse_count)
+            if not new_topics:
+                logger.info(f"[{self.account_name}] 所有帖子都已浏览，刷新页面获取新帖子...")
+                await asyncio.sleep(30)  # 等待一段时间再刷新
+                continue
 
-        for i, topic in enumerate(selected):
-            title = topic.get('title', 'Unknown')[:40]
-            href = topic.get('href', '')
+            # 随机打乱顺序
+            random.shuffle(new_topics)
 
-            logger.info(f"[{self.account_name}] [{i+1}/{browse_count}] 浏览: {title}...")
+            # 浏览帖子直到时间用完或帖子看完
+            for topic in new_topics:
+                # 检查时间是否用完
+                if time.time() >= end_time:
+                    break
 
-            try:
-                # 访问帖子
-                await tab.get(href)
-                await asyncio.sleep(random.uniform(2, 4))  # 等待页面加载
+                title = topic.get('title', 'Unknown')[:40]
+                href = topic.get('href', '')
 
-                # 分步滚动到底部（模拟真实阅读）
-                await self._scroll_and_read(tab, config)
+                logger.info(f"[{self.account_name}] [{browsed_count + 1}] 浏览: {title}...")
 
-                # 随机点赞
-                if random.random() < config['like_chance']:
-                    liked = await self._try_like_post(tab)
-                    if liked:
-                        self._likes_given += 1
+                try:
+                    # 访问帖子
+                    await tab.get(href)
+                    await asyncio.sleep(random.uniform(3, 5))  # 等待页面加载
 
-                browsed_count += 1
-            except Exception as e:
-                logger.warning(f"[{self.account_name}] 浏览帖子失败: {e}")
+                    # 分步滚动到底部（模拟真实阅读，尽量看完整个帖子）
+                    await self._scroll_and_read(tab, config)
+
+                    # 随机点赞
+                    if random.random() < config['like_chance']:
+                        liked = await self._try_like_post(tab)
+                        if liked:
+                            self._likes_given += 1
+
+                    browsed_count += 1
+                    browsed_urls.add(href)
+
+                except Exception as e:
+                    logger.warning(f"[{self.account_name}] 浏览帖子失败: {e}")
+
+        # 计算实际浏览时间
+        actual_time = int(time.time() - start_time)
+        actual_min = actual_time // 60
+        actual_sec = actual_time % 60
 
         logger.success(
-            f"[{self.account_name}] 成功浏览 {browsed_count} 个帖子，"
-            f"点赞 {self._likes_given} 次！"
+            f"[{self.account_name}] 浏览完成！"
+            f"共浏览 {browsed_count} 个帖子，点赞 {self._likes_given} 次，"
+            f"实际用时: {actual_min}分{actual_sec}秒"
         )
         return browsed_count
 
     async def _scroll_and_read(self, tab, config: dict) -> None:
         """分步滚动页面，模拟真实阅读行为
 
+        核心策略：
+        - 每次滚动间隔 5-8 秒，模拟真实阅读速度
+        - 滚动距离随机（200-500px），避免机械化
+        - 偶尔回滚一小段，模拟回看行为
+        - 尽量把帖子看完（滚动到底部）
+
         Args:
             tab: 浏览器标签页
-            config: 浏览配置（包含 scroll_delay, read_time, scroll_steps）
+            config: 浏览配置（包含 scroll_delay, scroll_back_chance）
         """
-        scroll_steps = config['scroll_steps']
         scroll_delay_min, scroll_delay_max = config['scroll_delay']
+        scroll_back_chance = config.get('scroll_back_chance', 0.2)
 
         # 获取页面高度
         page_height = await tab.evaluate("document.body.scrollHeight")
         viewport_height = await tab.evaluate("window.innerHeight")
 
-        # 计算每步滚动距离
+        # 计算需要滚动的总距离
         total_scroll = max(0, page_height - viewport_height)
-        step_scroll = total_scroll / scroll_steps if scroll_steps > 0 else total_scroll
+
+        if total_scroll <= 0:
+            # 页面不需要滚动，直接等待一段时间
+            delay = random.uniform(scroll_delay_min, scroll_delay_max)
+            logger.debug(f"[{self.account_name}]   页面无需滚动，阅读 {delay:.1f}s...")
+            await asyncio.sleep(delay)
+            return
 
         current_scroll = 0
-        for step in range(scroll_steps):
+        scroll_count = 0
+
+        # 持续滚动直到到达底部
+        while current_scroll < total_scroll:
+            scroll_count += 1
+
+            # 随机滚动距离（200-500px），模拟真实滚动
+            scroll_distance = random.randint(200, 500)
+
+            # 偶尔回滚一小段（模拟回看行为）
+            if scroll_count > 2 and random.random() < scroll_back_chance:
+                back_distance = random.randint(50, 150)
+                current_scroll = max(0, current_scroll - back_distance)
+                await tab.evaluate(f"window.scrollTo({{top: {current_scroll}, behavior: 'smooth'}})")
+                logger.debug(f"[{self.account_name}]   ↑ 回滚 {back_distance}px（模拟回看）")
+                await asyncio.sleep(random.uniform(1, 2))
+
             # 滚动一步
-            current_scroll += step_scroll
+            current_scroll = min(current_scroll + scroll_distance, total_scroll)
             await tab.evaluate(f"window.scrollTo({{top: {current_scroll}, behavior: 'smooth'}})")
 
-            # 等待 3-5 秒（或根据 level 配置）
+            # 等待 5-8 秒，模拟真实阅读
             delay = random.uniform(scroll_delay_min, scroll_delay_max)
-            logger.debug(f"[{self.account_name}]   滚动 {step+1}/{scroll_steps}，等待 {delay:.1f}s...")
+            progress = int(current_scroll / total_scroll * 100)
+            logger.debug(f"[{self.account_name}]   滚动 {scroll_count} ({progress}%)，阅读 {delay:.1f}s...")
             await asyncio.sleep(delay)
 
-        # 滚动到底部
+        # 确保滚动到底部
         await tab.evaluate("window.scrollTo({top: document.body.scrollHeight, behavior: 'smooth'})")
 
-        # 在底部停留一会儿
-        read_time_min, read_time_max = config['read_time']
-        final_read = random.uniform(read_time_min / 2, read_time_max / 2)
+        # 在底部停留一会儿（3-5 秒）
+        final_read = random.uniform(3, 5)
         logger.debug(f"[{self.account_name}]   底部阅读 {final_read:.1f}s...")
         await asyncio.sleep(final_read)
 

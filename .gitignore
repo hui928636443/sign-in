@@ -40,9 +40,10 @@ Thumbs.db
 .ace-tool/
 logs/
 accounts.json
+心得/
 
 # 签到账户
-签到账户
+签到账户/
 
 # Cookie 缓存（包含敏感信息）
 .linuxdo_cookies/

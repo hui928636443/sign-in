@@ -596,21 +596,42 @@ class BrowserManager:
         self._nodriver_browser = None  # nodriver 专用
         self._nodriver_tab = None  # nodriver 专用
 
-    async def start(self):
-        """启动浏览器"""
+    async def start(self, max_retries: int = 3):
+        """启动浏览器
+
+        Args:
+            max_retries: nodriver 启动失败时的最大重试次数（仅 CI 环境）
+        """
         is_ci = bool(os.environ.get("CI")) or bool(os.environ.get("GITHUB_ACTIONS"))
 
         if self.engine == "nodriver":
             if is_ci:
-                # CI 环境中 nodriver 连接不稳定，尝试启动，失败则回退到 patchright
-                try:
-                    await self._start_nodriver()
-                except BrowserStartupError as e:
-                    logger.warning(
-                        f"nodriver 在 CI 环境启动失败，自动回退到 patchright: {e.message}"
-                    )
-                    self.engine = "patchright"
-                    await self._start_patchright()
+                # CI 环境中 nodriver 连接不稳定，使用重试机制
+                last_error = None
+                for attempt in range(max_retries):
+                    try:
+                        logger.info(f"nodriver 启动尝试 {attempt + 1}/{max_retries}...")
+                        await self._start_nodriver()
+                        logger.success(f"nodriver 启动成功（第 {attempt + 1} 次尝试）")
+                        return self
+                    except BrowserStartupError as e:
+                        last_error = e
+                        logger.warning(
+                            f"nodriver 启动失败（第 {attempt + 1}/{max_retries} 次）: {e.message}"
+                        )
+                        if attempt < max_retries - 1:
+                            wait_time = 2 * (attempt + 1)  # 递增等待：2s, 4s, 6s
+                            logger.info(f"等待 {wait_time} 秒后重试...")
+                            await asyncio.sleep(wait_time)
+                            # 清理可能残留的浏览器进程
+                            await self._cleanup_nodriver()
+
+                # 所有重试都失败
+                raise BrowserStartupError(
+                    message=f"nodriver 启动失败，已重试 {max_retries} 次",
+                    environment_info=last_error.environment_info if last_error else "",
+                    suggestions="- 检查 Chrome 是否正确安装\n- 检查 Xvfb 是否正常运行"
+                )
             else:
                 await self._start_nodriver()
         elif self.engine == "drissionpage":
@@ -977,19 +998,53 @@ class BrowserManager:
         logger.info("Camoufox 浏览器启动成功")
 
     async def _start_patchright(self):
-        """启动 Patchright 浏览器"""
+        """启动 Patchright 浏览器
+
+        在 CI 环境中配合 Xvfb 使用非 headless 模式，以绕过 Cloudflare 检测。
+        Cloudflare 会检测浏览器的渲染堆栈，headless 模式缺少显示器支持容易被识别。
+        """
         from patchright.async_api import async_playwright
 
-        logger.info(f"启动 Patchright 浏览器 (headless={self.headless})")
+        # 检测 CI 环境和 Xvfb
+        is_ci = bool(os.environ.get("CI")) or bool(os.environ.get("GITHUB_ACTIONS"))
+        display_set = bool(os.environ.get("DISPLAY"))
+
+        # 在 CI 环境中，如果有 Xvfb（DISPLAY 已设置），使用非 headless 模式
+        # 这样 Cloudflare 更难检测到自动化
+        use_headless = self.headless
+        if is_ci and display_set and self.headless:
+            use_headless = False
+            logger.info(
+                f"CI 环境检测到 DISPLAY={os.environ.get('DISPLAY')}，"
+                f"Patchright 切换到非 headless 模式（配合 Xvfb，更难被 Cloudflare 检测）"
+            )
+
+        logger.info(f"启动 Patchright 浏览器 (headless={use_headless})")
 
         self._playwright = await async_playwright().start()
 
+        # 浏览器启动参数
+        browser_args = [
+            "--no-sandbox",
+            "--disable-blink-features=AutomationControlled",
+            "--disable-dev-shm-usage",  # CI 环境避免 /dev/shm 空间不足
+        ]
+
+        # CI 环境额外参数
+        if is_ci:
+            browser_args.extend([
+                "--disable-gpu",
+                "--disable-extensions",
+                "--disable-background-networking",
+                "--disable-default-apps",
+                "--disable-sync",
+                "--no-first-run",
+                "--window-size=1920,1080",
+            ])
+
         self._browser = await self._playwright.chromium.launch(
-            headless=self.headless,
-            args=[
-                "--no-sandbox",
-                "--disable-blink-features=AutomationControlled",
-            ]
+            headless=use_headless,
+            args=browser_args,
         )
 
         self._context = await self._browser.new_context(
@@ -1161,6 +1216,15 @@ class BrowserManager:
 
         logger.warning(f"Cloudflare 验证超时 ({timeout}s)")
         return False
+
+    async def _cleanup_nodriver(self):
+        """清理 nodriver 相关资源（用于重试前的清理）"""
+        with contextlib.suppress(Exception):
+            if self._nodriver_browser:
+                self._nodriver_browser.stop()
+                self._nodriver_browser = None
+        with contextlib.suppress(Exception):
+            self._nodriver_tab = None
 
     async def close(self):
         """关闭浏览器"""
