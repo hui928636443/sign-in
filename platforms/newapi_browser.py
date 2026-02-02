@@ -187,24 +187,83 @@ class NewAPIBrowserCheckin:
             logger.error(f"[{self.account_name}] 签到请求失败: {e}")
             return False, f"请求失败: {e}", details
 
-    async def _wait_for_cloudflare(self, tab, timeout: int = 30) -> bool:
-        """等待 Cloudflare 挑战完成（参考 linuxdo.py）"""
+    async def _wait_for_cloudflare(self, tab, timeout: int = 45) -> bool:
+        """等待 Cloudflare 挑战完成（支持 5 秒盾和 Turnstile 验证）"""
         logger.info(f"[{self.account_name}] 检测 Cloudflare 挑战...")
         start_time = asyncio.get_event_loop().time()
+        turnstile_clicked = False
 
         while asyncio.get_event_loop().time() - start_time < timeout:
             try:
                 title = await tab.evaluate("document.title")
-                cf_indicators = ["just a moment", "checking your browser", "please wait", "verifying"]
+                # 检测页面标题中的 Cloudflare 特征
+                cf_indicators = ["just a moment", "checking your browser", "please wait", "verifying", "请稍候"]
                 title_lower = title.lower() if title else ""
-                is_cf_page = any(ind in title_lower for ind in cf_indicators)
+                is_cf_title = any(ind in title_lower for ind in cf_indicators)
+
+                # 检测页面内容中的 Cloudflare Turnstile 特征
+                has_turnstile = await tab.evaluate(r"""
+                    (function() {
+                        // 检查是否有 Turnstile iframe
+                        const iframes = document.querySelectorAll('iframe[src*="challenges.cloudflare.com"]');
+                        if (iframes.length > 0) return true;
+
+                        // 检查页面文字是否包含验证提示
+                        const bodyText = document.body?.innerText || '';
+                        const cfTexts = ['确认您是真人', '验证您是真人', 'verify you are human', '检查您的连接'];
+                        return cfTexts.some(t => bodyText.toLowerCase().includes(t.toLowerCase()));
+                    })()
+                """)
+
+                is_cf_page = is_cf_title or has_turnstile
 
                 if not is_cf_page and title:
                     logger.success(f"[{self.account_name}] Cloudflare 验证通过！")
                     await self._save_debug_screenshot(tab, "cf_passed")
                     return True
+
                 if is_cf_page:
-                    logger.debug(f"[{self.account_name}] 等待 Cloudflare... 标题: {title}")
+                    logger.debug(f"[{self.account_name}] 等待 Cloudflare... 标题: {title}, Turnstile: {has_turnstile}")
+
+                    # 尝试点击 Turnstile 验证框（使用坐标点击，因为 iframe 内容无法直接访问）
+                    if not turnstile_clicked:
+                        try:
+                            # 获取 Turnstile iframe 的位置
+                            iframe_rect = await tab.evaluate(r"""
+                                (function() {
+                                    const iframes = document.querySelectorAll('iframe[src*="challenges.cloudflare.com"]');
+                                    for (const iframe of iframes) {
+                                        const rect = iframe.getBoundingClientRect();
+                                        if (rect.width > 0 && rect.height > 0) {
+                                            return {
+                                                x: rect.x,
+                                                y: rect.y,
+                                                width: rect.width,
+                                                height: rect.height
+                                            };
+                                        }
+                                    }
+                                    return null;
+                                })()
+                            """)
+
+                            if iframe_rect:
+                                # Turnstile 复选框通常在 iframe 左侧，偏移约 (30, 25) 的位置
+                                click_x = iframe_rect["x"] + 30
+                                click_y = iframe_rect["y"] + 25
+                                logger.info(
+                                    f"[{self.account_name}] 发现 Turnstile iframe，"
+                                    f"尝试点击坐标 ({click_x}, {click_y})"
+                                )
+
+                                # 使用 nodriver 的鼠标点击（正确方法是 mouse_click）
+                                await tab.mouse_click(click_x, click_y)
+                                turnstile_clicked = True
+                                logger.info(f"[{self.account_name}] 已点击 Turnstile 复选框")
+                                await asyncio.sleep(3)  # 等待验证处理
+                        except Exception as e:
+                            logger.debug(f"[{self.account_name}] 点击 Turnstile 失败: {e}")
+
                     if self._debug:
                         await self._save_debug_screenshot(tab, "cf_waiting")
             except Exception as e:
