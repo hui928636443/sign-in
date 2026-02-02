@@ -63,6 +63,10 @@ jobs:
           # DEBUG: "true"
           NEWAPI_DEBUG: ${{ github.event.inputs.debug || 'false' }}
           
+          # LinuxDO 账户（用于浏览器回退登录）
+          # JSON 格式: [{"username": "email", "password": "pass", "name": "显示名"}]
+          LINUXDO_ACCOUNTS: ${{ secrets.LINUXDO_ACCOUNTS }}
+          
           # NewAPI 站点统一配置（支持所有 NewAPI 架构的站点）
           # JSON 格式: [{"name": "账号名", "provider": "站点ID", "cookies": {"session": "xxx"}, "api_user": "123"}]
           # 支持的 provider: anyrouter, wong, elysiver, kfcapi, duckcoding, runanytime, neb, zeroliya, mitchll 等

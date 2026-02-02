@@ -7,6 +7,7 @@
 简化版：
 - linuxdo: 浏览 LinuxDO 帖子
 - newapi: 所有 NewAPI 架构站点的签到（使用 Cookie + API）
+- 支持 401/403 失败后自动使用浏览器 OAuth 重试
 """
 
 import ssl
@@ -38,6 +39,22 @@ class PlatformManager:
         self.config = config
         self.notify = NotificationManager()
         self.results: list[CheckinResult] = []
+        # 缓存 LinuxDO 账户，用于浏览器回退登录
+        self._linuxdo_accounts: list[dict] = []
+        self._load_linuxdo_accounts()
+
+    def _load_linuxdo_accounts(self) -> None:
+        """加载 LinuxDO 账户用于浏览器回退登录"""
+        # 从配置中获取 LinuxDO 账户
+        if self.config.linuxdo_accounts:
+            for acc in self.config.linuxdo_accounts:
+                self._linuxdo_accounts.append({
+                    "username": acc.username,
+                    "password": acc.password,
+                    "name": acc.name,
+                })
+        if self._linuxdo_accounts:
+            logger.info(f"已加载 {len(self._linuxdo_accounts)} 个 LinuxDO 账户用于浏览器回退登录")
 
     async def run_all(self) -> list[CheckinResult]:
         """运行所有平台签到"""
@@ -109,11 +126,14 @@ class PlatformManager:
         return results
 
     async def _run_all_newapi(self) -> list[CheckinResult]:
-        """运行所有 NewAPI 站点签到（纯 Cookie + API 方式）"""
+        """运行所有 NewAPI 站点签到（支持 Cookie + API，失败后浏览器回退）"""
         if not self.config.anyrouter_accounts:
             return []
 
         results = []
+        # 记录需要浏览器回退的账户
+        failed_accounts = []
+
         for i, account in enumerate(self.config.anyrouter_accounts):
             account_name = account.get_display_name(i)
             provider_name = account.provider
@@ -139,6 +159,20 @@ class PlatformManager:
 
             try:
                 result = await self._checkin_newapi(account, provider, account_name)
+
+                # 检查是否需要浏览器回退（401/403 错误）
+                if result.status == CheckinStatus.FAILED:
+                    msg = result.message or ""
+                    if "401" in msg or "403" in msg or "过期" in msg:
+                        logger.warning(f"[{account_name}] Cookie 失效，标记为需要浏览器回退")
+                        failed_accounts.append({
+                            "account": account,
+                            "provider": provider,
+                            "account_name": account_name,
+                            "original_result": result,
+                        })
+                        continue  # 先不添加结果，等浏览器回退后再添加
+
                 results.append(result)
             except Exception as e:
                 logger.error(f"[{account_name}] 签到异常: {e}")
@@ -148,6 +182,63 @@ class PlatformManager:
                     status=CheckinStatus.FAILED,
                     message=f"签到异常: {str(e)}",
                 ))
+
+        # 处理需要浏览器回退的账户
+        if failed_accounts and self._linuxdo_accounts:
+            logger.info(f"开始浏览器回退登录，共 {len(failed_accounts)} 个失败账户")
+            browser_results = await self._browser_fallback_checkin(failed_accounts)
+            results.extend(browser_results)
+        elif failed_accounts:
+            # 没有 LinuxDO 账户，直接返回失败结果
+            logger.warning("没有配置 LinuxDO 账户，无法进行浏览器回退登录")
+            for item in failed_accounts:
+                results.append(item["original_result"])
+
+        return results
+
+    async def _browser_fallback_checkin(self, failed_accounts: list[dict]) -> list[CheckinResult]:
+        """使用浏览器 OAuth 登录进行回退签到"""
+        from platforms.newapi_browser import browser_checkin_newapi
+
+        results = []
+        # 使用第一个 LinuxDO 账户进行登录
+        linuxdo_account = self._linuxdo_accounts[0]
+        linuxdo_username = linuxdo_account["username"]
+        linuxdo_password = linuxdo_account["password"]
+
+        logger.info(f"使用 LinuxDO 账户 [{linuxdo_account.get('name', linuxdo_username)}] 进行浏览器回退登录")
+
+        for item in failed_accounts:
+            account = item["account"]
+            provider = item["provider"]
+            account_name = item["account_name"]
+
+            logger.info(f"[{account_name}] 尝试浏览器 OAuth 登录...")
+
+            try:
+                # 使用浏览器签到模块
+                result = await browser_checkin_newapi(
+                    provider_name=provider.name,
+                    linuxdo_username=linuxdo_username,
+                    linuxdo_password=linuxdo_password,
+                    cookies=account.cookies if hasattr(account, 'cookies') else None,
+                    api_user=account.api_user if hasattr(account, 'api_user') else None,
+                    account_name=account_name,
+                )
+
+                if result.status == CheckinStatus.SUCCESS:
+                    logger.success(f"[{account_name}] 浏览器回退签到成功！")
+                else:
+                    logger.error(f"[{account_name}] 浏览器回退签到失败: {result.message}")
+
+                results.append(result)
+
+            except Exception as e:
+                logger.error(f"[{account_name}] 浏览器回退签到异常: {e}")
+                # 返回原始失败结果
+                original_result = item["original_result"]
+                original_result.message = f"{original_result.message} (浏览器回退也失败: {e})"
+                results.append(original_result)
 
         return results
 
@@ -335,17 +426,17 @@ class PlatformManager:
 
                 page = await context.new_page()
                 logger.debug(f"[{account_name}] 访问登录页面: {login_url}")
-                
+
                 # 先访问页面，等待 Cloudflare 验证
                 await page.goto(login_url, wait_until="domcontentloaded", timeout=60000)
-                
+
                 # 等待 Cloudflare 验证完成（最多等待 30 秒）
                 for _ in range(30):
                     title = await page.title()
                     if "just a moment" not in title.lower() and "请稍候" not in title:
                         break
                     await page.wait_for_timeout(1000)
-                
+
                 # 等待页面完全加载
                 try:
                     await page.wait_for_load_state("networkidle", timeout=10000)
