@@ -38,43 +38,35 @@ logger.add(
     level="DEBUG"
 )
 
-# 账号配置
+# 账号配置（请修改为你自己的账号信息）
+# - username: LinuxDO 登录邮箱
+# - password: LinuxDO 登录密码
+# - browse_enabled: 是否启用浏览（True/False）
+# - name: 账号备注名称
+# - level: 刷帖等级（1=快速刷帖每帖1分钟, 2=中速, 3=慢速模拟真人阅读）
 ACCOUNTS = [
     {
-        "username": "yaoyonghui522111@gmail.com",
-        "password": "hui123456789Y",
+        "username": "your_email_1@example.com",
+        "password": "your_password_1",
         "browse_enabled": True,
         "name": "主账号",
         "level": 3
     },
     {
-        "username": "928636443@qq.com",
-        "password": "hui123456789Y",
+        "username": "your_email_2@example.com",
+        "password": "your_password_2",
         "browse_enabled": True,
         "name": "小号1",
         "level": 1
     },
-    {
-        "username": "yyh5656ovo@gmail.com",
-        "password": "hui123456789Y",
-        "browse_enabled": True,
-        "name": "小号2",
-        "level": 1
-    },
-    {
-        "username": "maidou928636@gmail.com",
-        "password": "hui123456789Y",
-        "browse_enabled": True,
-        "name": "小号3",
-        "level": 1
-    },
-    {
-        "username": "3109638996@qq.com",
-        "password": "hui123456789Y",
-        "browse_enabled": True,
-        "name": "小号4",
-        "level": 1
-    }
+    # 可以继续添加更多账号...
+    # {
+    #     "username": "your_email_3@example.com",
+    #     "password": "your_password_3",
+    #     "browse_enabled": True,
+    #     "name": "小号2",
+    #     "level": 1
+    # },
 ]
 
 # 定时配置
