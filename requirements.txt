@@ -1,0 +1,4 @@
+# LinuxDO 多账号定时刷帖脚本依赖
+nodriver>=0.32
+loguru>=0.7.0
+schedule>=1.2.0
