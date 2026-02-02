@@ -1,0 +1,16 @@
+[
+  {
+    "username": "your_email@example.com",
+    "password": "your_password",
+    "browse_enabled": true,
+    "name": "主账号",
+    "level": 3
+  },
+  {
+    "username": "account2@example.com",
+    "password": "password2",
+    "browse_enabled": true,
+    "name": "小号1",
+    "level": 1
+  }
+]
