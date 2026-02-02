@@ -1,4 +1,4 @@
-// NewAPI 站点配置 - 默认站点
+  // NewAPI 站点配置 - 默认站点
 const DEFAULT_SITES = {
   wong: { domain: "wzw.pp.ua", name: "WONG公益站", provider: "wong", url: "https://wzw.pp.ua" },
   elysiver: { domain: "elysiver.h-e.top", name: "Elysiver", provider: "elysiver", url: "https://elysiver.h-e.top" },
@@ -7,6 +7,12 @@ const DEFAULT_SITES = {
   runanytime: { domain: "runanytime.hxi.me", name: "随时跑路", provider: "runanytime", url: "https://runanytime.hxi.me" },
   neb: { domain: "ai.zzhdsgsss.xyz", name: "NEB公益站", provider: "neb", url: "https://ai.zzhdsgsss.xyz" },
   mitchll: { domain: "api.mitchll.com", name: "Mitchll-api", provider: "mitchll", url: "https://api.mitchll.com" },
+  kingo: { domain: "new-api-bxhm.onrender.com", name: "Kingo API", provider: "kingo", url: "https://new-api-bxhm.onrender.com" },
+  techstar: { domain: "aidrouter.qzz.io", name: "TechnologyStar", provider: "techstar", url: "https://aidrouter.qzz.io" },
+  lightllm: { domain: "lightllm.online", name: "轻のLLM", provider: "lightllm", url: "https://lightllm.online" },
+  hotaru: { domain: "api.hotaruapi.top", name: "Hotaru API", provider: "hotaru", url: "https://api.hotaruapi.top" },
+  dev88: { domain: "api.dev88.tech", name: "DEV88公益站", provider: "dev88", url: "https://api.dev88.tech" },
+  huan: { domain: "ai.huan666.de", name: "huan公益站", provider: "huan", url: "https://ai.huan666.de" },
   anyrouter: { domain: "anyrouter.top", name: "AnyRouter", provider: "anyrouter", url: "https://anyrouter.top" },
 };
 
@@ -170,7 +176,12 @@ async function getUserInfoFromPage(domain) {
   }
 
   try {
-    const results = await chrome.scripting.executeScript({
+    // 添加超时处理，5秒超时
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error("timeout")), 5000)
+    );
+    
+    const scriptPromise = chrome.scripting.executeScript({
       target: { tabId: tabs[0].id },
       func: () => {
         try {
@@ -189,9 +200,10 @@ async function getUserInfoFromPage(domain) {
       },
     });
 
+    const results = await Promise.race([scriptPromise, timeoutPromise]);
     return results[0]?.result || { username: null, api_user: null };
   } catch (e) {
-    console.error("执行脚本失败:", e);
+    console.error("执行脚本失败或超时:", e);
     return { username: null, api_user: null };
   }
 }
