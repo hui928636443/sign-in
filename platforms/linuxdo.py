@@ -366,18 +366,26 @@ class LinuxDOAdapter(BasePlatformAdapter):
                 pass
             await asyncio.sleep(1)
 
-        # 5. 填写用户名
+        # 5. 填写用户名（使用 JS 直接赋值，避免 send_keys 丢失字符）
         try:
-            username_input = await tab.select('#login-account-name', timeout=5)
-            if not username_input:
-                username_input = await tab.select('input[name="login"]', timeout=3)
-            if not username_input:
-                username_input = await tab.select('input[type="text"]', timeout=3)
+            # 使用 JS 直接设置输入框的值，比 send_keys 更可靠
+            username_filled = await tab.evaluate(f"""
+                (function() {{
+                    const input = document.querySelector('#login-account-name') ||
+                                  document.querySelector('input[name="login"]') ||
+                                  document.querySelector('input[type="text"]');
+                    if (input) {{
+                        input.focus();
+                        input.value = '{self.username}';
+                        input.dispatchEvent(new Event('input', {{ bubbles: true }}));
+                        input.dispatchEvent(new Event('change', {{ bubbles: true }}));
+                        return true;
+                    }}
+                    return false;
+                }})()
+            """)
 
-            if username_input:
-                await username_input.click()
-                await asyncio.sleep(0.3)
-                await username_input.send_keys(self.username)
+            if username_filled:
                 logger.info(f"[{self.account_name}] 已输入用户名")
                 await asyncio.sleep(0.5)
             else:
@@ -387,16 +395,27 @@ class LinuxDOAdapter(BasePlatformAdapter):
             logger.error(f"[{self.account_name}] 输入用户名失败: {e}")
             return False
 
-        # 6. 填写密码
+        # 6. 填写密码（使用 JS 直接赋值）
         try:
-            password_input = await tab.select('#login-account-password', timeout=5)
-            if not password_input:
-                password_input = await tab.select('input[type="password"]', timeout=3)
+            # 转义密码中的特殊字符（单引号、反斜杠）
+            escaped_password = self.password.replace("\\", "\\\\").replace("'", "\\'")
 
-            if password_input:
-                await password_input.click()
-                await asyncio.sleep(0.3)
-                await password_input.send_keys(self.password)
+            password_filled = await tab.evaluate(f"""
+                (function() {{
+                    const input = document.querySelector('#login-account-password') ||
+                                  document.querySelector('input[type="password"]');
+                    if (input) {{
+                        input.focus();
+                        input.value = '{escaped_password}';
+                        input.dispatchEvent(new Event('input', {{ bubbles: true }}));
+                        input.dispatchEvent(new Event('change', {{ bubbles: true }}));
+                        return true;
+                    }}
+                    return false;
+                }})()
+            """)
+
+            if password_filled:
                 logger.info(f"[{self.account_name}] 已输入密码")
                 await asyncio.sleep(0.5)
             else:

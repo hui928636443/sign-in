@@ -126,15 +126,21 @@ class NewAPIBrowserCheckin:
         # 访问登录页
         logger.info(f"[{self.account_name}] 访问 LinuxDO 登录页...")
         await self.tab.get(self.LINUXDO_LOGIN_URL)
-        await asyncio.sleep(3)
+        await asyncio.sleep(5)  # 等待页面完全加载
 
         # 等待登录表单
+        logger.info(f"[{self.account_name}] 等待登录表单加载...")
         for _ in range(10):
             try:
                 has_input = await self.tab.evaluate("""
-                    !!document.querySelector('#login-account-name, input[name="login"]')
+                    (function() {
+                        const input = document.querySelector('#login-account-name') ||
+                                      document.querySelector('input[name="login"]');
+                        return !!input;
+                    })()
                 """)
                 if has_input:
+                    logger.info(f"[{self.account_name}] 登录表单已加载")
                     break
             except Exception:
                 pass
@@ -152,7 +158,13 @@ class NewAPIBrowserCheckin:
             if username_input:
                 await username_input.click()
                 await asyncio.sleep(0.3)
-                await username_input.send_keys(self.linuxdo_username)
+                # 使用 apply 强制聚焦
+                await username_input.apply("(elem) => elem.focus()")
+                await asyncio.sleep(0.2)
+                # 逐字输入（模拟真人）
+                for char in self.linuxdo_username:
+                    await username_input.send_keys(char)
+                    await asyncio.sleep(0.05)
                 logger.info(f"[{self.account_name}] 已输入用户名")
                 await asyncio.sleep(0.5)
             else:
@@ -171,7 +183,13 @@ class NewAPIBrowserCheckin:
             if password_input:
                 await password_input.click()
                 await asyncio.sleep(0.3)
-                await password_input.send_keys(self.linuxdo_password)
+                # 使用 apply 强制聚焦
+                await password_input.apply("(elem) => elem.focus()")
+                await asyncio.sleep(0.2)
+                # 逐字输入（模拟真人）
+                for char in self.linuxdo_password:
+                    await password_input.send_keys(char)
+                    await asyncio.sleep(0.05)
                 logger.info(f"[{self.account_name}] 已输入密码")
                 await asyncio.sleep(0.5)
             else:
