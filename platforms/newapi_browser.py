@@ -188,10 +188,15 @@ class NewAPIBrowserCheckin:
             return False, f"请求失败: {e}", details
 
     async def _wait_for_cloudflare(self, tab, timeout: int = 45) -> bool:
-        """等待 Cloudflare 挑战完成（支持 5 秒盾和 Turnstile 验证）"""
+        """等待 Cloudflare 挑战完成（支持 5 秒盾和 Turnstile 验证）
+        
+        Turnstile 验证框通常在封闭的 Shadow DOM 中，传统 querySelector 无法访问内部元素。
+        解决方案：定位外层容器 (.cf-turnstile)，然后通过坐标点击复选框位置。
+        """
         logger.info(f"[{self.account_name}] 检测 Cloudflare 挑战...")
         start_time = asyncio.get_event_loop().time()
-        turnstile_clicked = False
+        turnstile_click_count = 0
+        max_turnstile_clicks = 3  # 最多尝试点击 3 次
 
         while asyncio.get_event_loop().time() - start_time < timeout:
             try:
@@ -201,26 +206,24 @@ class NewAPIBrowserCheckin:
                 title_lower = title.lower() if title else ""
                 is_cf_title = any(ind in title_lower for ind in cf_indicators)
 
-                # 检测页面内容中的 Cloudflare Turnstile 特征
+                # 检测页面内容中的 Cloudflare Turnstile 特征（简化版）
                 has_turnstile = await tab.evaluate(r"""
                     (function() {
-                        // 检查是否有 Turnstile iframe（多种选择器）
-                        const selectors = [
-                            'iframe[src*="challenges.cloudflare.com"]',
-                            'iframe[src*="turnstile"]',
-                            'iframe[title*="Cloudflare"]',
-                            'iframe[title*="Widget containing"]',
-                            'div.cf-turnstile iframe',
-                            'div[data-sitekey] iframe'
+                        // 检查 Turnstile 容器
+                        const containerSelectors = [
+                            '.cf-turnstile',
+                            'div[data-sitekey]',
+                            '#turnstile-wrapper',
+                            'div[id*="turnstile"]',
+                            'div[class*="turnstile"]'
                         ];
-                        for (const sel of selectors) {
-                            const iframes = document.querySelectorAll(sel);
-                            if (iframes.length > 0) return true;
+                        for (const sel of containerSelectors) {
+                            if (document.querySelector(sel)) return true;
                         }
-
-                        // 检查页面文字是否包含验证提示
+                        
+                        // 检查页面文字
                         const bodyText = document.body?.innerText || '';
-                        const cfTexts = ['确认您是真人', '验证您是真人', 'verify you are human', '检查您的连接'];
+                        const cfTexts = ['确认您是真人', '验证您是真人', 'verify you are human'];
                         return cfTexts.some(t => bodyText.toLowerCase().includes(t.toLowerCase()));
                     })()
                 """)
@@ -235,82 +238,91 @@ class NewAPIBrowserCheckin:
                 if is_cf_page:
                     logger.debug(f"[{self.account_name}] 等待 Cloudflare... 标题: {title}, Turnstile: {has_turnstile}")
 
-                    # 尝试点击 Turnstile 验证框（使用坐标点击，因为 iframe 内容无法直接访问）
-                    if not turnstile_clicked:
-                        try:
-                            # 获取 Turnstile iframe 的位置（使用多种选择器）
-                            iframe_rect = await tab.evaluate(r"""
-                                (function() {
-                                    // 多种选择器尝试定位 Turnstile iframe
-                                    const selectors = [
-                                        'iframe[src*="challenges.cloudflare.com"]',
-                                        'iframe[src*="turnstile"]',
-                                        'iframe[title*="Cloudflare"]',
-                                        'iframe[title*="Widget containing"]',
-                                        'div.cf-turnstile iframe',
-                                        'div[data-sitekey] iframe',
-                                        // 通用 iframe 选择器（最后尝试）
-                                        'iframe'
-                                    ];
-                                    
-                                    for (const sel of selectors) {
-                                        const iframes = document.querySelectorAll(sel);
-                                        for (const iframe of iframes) {
-                                            const rect = iframe.getBoundingClientRect();
-                                            // 检查 iframe 是否可见且尺寸合理（Turnstile 通常是 300x65 左右）
-                                            if (rect.width > 200 && rect.width < 400 && 
-                                                rect.height > 50 && rect.height < 100) {
-                                                return {
-                                                    x: rect.x,
-                                                    y: rect.y,
-                                                    width: rect.width,
-                                                    height: rect.height,
-                                                    selector: sel
-                                                };
+                    # 尝试点击 Turnstile 验证框
+                    if turnstile_click_count < max_turnstile_clicks:
+                        # 获取容器位置（多种方法）
+                        container_rect = await tab.evaluate(r"""
+                            (function() {
+                                // 方法1: 标准容器选择器
+                                const containerSelectors = [
+                                    '.cf-turnstile',
+                                    'div[data-sitekey]',
+                                    '#turnstile-wrapper',
+                                    '#challenge-stage',
+                                    '.challenge-container',
+                                    '.main-wrapper',
+                                    '.spacer'
+                                ];
+                                for (const sel of containerSelectors) {
+                                    const container = document.querySelector(sel);
+                                    if (container) {
+                                        const rect = container.getBoundingClientRect();
+                                        if (rect.width > 0 && rect.height > 0) {
+                                            return [rect.x, rect.y, rect.width, rect.height, sel];
+                                        }
+                                    }
+                                }
+                                
+                                // 方法2: 查找包含验证文字的元素
+                                const cfTexts = ['确认您是真人', '验证您是真人', 'Verify you are human'];
+                                const allElements = document.querySelectorAll('div, span, label, p');
+                                for (const el of allElements) {
+                                    const text = el.innerText || '';
+                                    for (const cfText of cfTexts) {
+                                        if (text.includes(cfText)) {
+                                            const rect = el.getBoundingClientRect();
+                                            // 找到合适大小的容器（Turnstile 通常是 300x65 左右）
+                                            if (rect.width >= 100 && rect.width <= 500 && rect.height >= 30 && rect.height <= 150) {
+                                                return [rect.x, rect.y, rect.width, rect.height, 'text-match'];
                                             }
                                         }
                                     }
-                                    
-                                    // 如果没找到合适尺寸的，返回第一个可见的 iframe
-                                    for (const sel of selectors) {
-                                        const iframes = document.querySelectorAll(sel);
-                                        for (const iframe of iframes) {
-                                            const rect = iframe.getBoundingClientRect();
-                                            if (rect.width > 0 && rect.height > 0) {
-                                                return {
-                                                    x: rect.x,
-                                                    y: rect.y,
-                                                    width: rect.width,
-                                                    height: rect.height,
-                                                    selector: sel
-                                                };
-                                            }
-                                        }
-                                    }
-                                    return null;
-                                })()
-                            """)
-
-                            if iframe_rect:
-                                # Turnstile 复选框通常在 iframe 左侧，偏移约 (30, 25) 的位置
-                                click_x = iframe_rect["x"] + 30
-                                click_y = iframe_rect["y"] + 25
+                                }
+                                
+                                // 方法3: 返回页面中央位置（Turnstile 通常在页面中央）
+                                // 复选框通常在页面中央偏左的位置
+                                const w = window.innerWidth || 1920;
+                                const h = window.innerHeight || 1080;
+                                return [w / 2 - 120, h / 2 - 20, 300, 65, 'center-fallback'];
+                            })()
+                        """)
+                        
+                        # 确保返回的是数组格式，且元素是数字
+                        if container_rect and isinstance(container_rect, (list, tuple)) and len(container_rect) >= 4:
+                            try:
+                                # 提取坐标值，处理可能的类型问题
+                                def to_float(val):
+                                    if isinstance(val, (int, float)):
+                                        return float(val)
+                                    if isinstance(val, dict):
+                                        # nodriver 有时返回 {'type': 'number', 'value': 123} 格式
+                                        return float(val.get('value', 0))
+                                    return float(val)
+                                
+                                x = to_float(container_rect[0])
+                                y = to_float(container_rect[1])
+                                w = to_float(container_rect[2])
+                                h = to_float(container_rect[3])
+                                selector = container_rect[4] if len(container_rect) > 4 else 'N/A'
+                                
+                                # 复选框位置：容器左上角偏移约 (40, 40) 像素
+                                click_x = x + 40
+                                click_y = y + 40
+                                
                                 logger.info(
-                                    f"[{self.account_name}] 发现 Turnstile iframe "
-                                    f"(selector: {iframe_rect.get('selector', 'unknown')}, "
-                                    f"size: {iframe_rect['width']}x{iframe_rect['height']}), "
-                                    f"尝试点击坐标 ({click_x}, {click_y})"
+                                    f"[{self.account_name}] 发现 Turnstile 容器 "
+                                    f"(selector: {selector}, size: {w:.0f}x{h:.0f}), "
+                                    f"尝试点击坐标 ({click_x:.0f}, {click_y:.0f})"
                                 )
 
-                                # 使用 nodriver 的鼠标点击
                                 await tab.mouse_click(click_x, click_y)
-                                turnstile_clicked = True
-                                logger.info(f"[{self.account_name}] 已点击 Turnstile 复选框")
-                                await asyncio.sleep(3)  # 等待验证处理
-                            else:
-                                logger.debug(f"[{self.account_name}] 未找到 Turnstile iframe")
-                        except Exception as e:
-                            logger.debug(f"[{self.account_name}] 点击 Turnstile 失败: {e}")
+                                turnstile_click_count += 1
+                                logger.info(f"[{self.account_name}] 已点击 Turnstile (第 {turnstile_click_count} 次)")
+                                await asyncio.sleep(4)
+                            except Exception as e:
+                                logger.debug(f"[{self.account_name}] 点击 Turnstile 失败: {e}")
+                        else:
+                            logger.debug(f"[{self.account_name}] 未找到 Turnstile 容器，等待...")
 
                     if self._debug:
                         await self._save_debug_screenshot(tab, "cf_waiting")
@@ -323,7 +335,11 @@ class NewAPIBrowserCheckin:
         return False
 
     async def _login_linuxdo(self, tab) -> bool:
-        """登录 LinuxDO（参考 linuxdo.py 的成功实现，使用 JS 直接赋值）"""
+        """登录 LinuxDO（参考 linuxdo.py 的成功实现，使用 JS 直接赋值）
+        
+        Discourse 论坛的登录表单是模态框形式，访问 /login 会自动触发模态框。
+        如果模态框没有自动弹出，需要手动点击登录按钮。
+        """
         # 1. 先访问首页，让 Cloudflare 验证
         logger.info(f"[{self.account_name}] 访问 LinuxDO 首页...")
         await tab.get(self.LINUXDO_URL)
@@ -355,15 +371,18 @@ class NewAPIBrowserCheckin:
         except Exception:
             pass
 
-        # 3. 访问登录页面
+        # 3. 访问登录页面（Discourse 会自动弹出登录模态框）
         logger.info(f"[{self.account_name}] 访问登录页面...")
         await tab.get(self.LINUXDO_LOGIN_URL)
-        await asyncio.sleep(5)
+        
+        # 等待页面加载完成
+        await asyncio.sleep(3)
         await self._log_page_info(tab, "linuxdo_login_page")
         await self._save_debug_screenshot(tab, "linuxdo_login_page")
 
-        # 4. 等待登录表单加载
-        for _ in range(10):
+        # 4. 等待登录表单加载（模态框形式）
+        login_form_found = False
+        for attempt in range(15):  # 增加到 15 次尝试
             try:
                 has_input = await tab.evaluate("""
                     (function() {
@@ -372,10 +391,61 @@ class NewAPIBrowserCheckin:
                 """)
                 if has_input:
                     logger.info(f"[{self.account_name}] 登录表单已加载")
+                    login_form_found = True
                     break
             except Exception:
                 pass
+            
+            # 如果表单没出现，尝试点击登录按钮触发模态框
+            if attempt == 5:
+                logger.info(f"[{self.account_name}] 尝试点击登录按钮触发模态框...")
+                try:
+                    clicked = await tab.evaluate("""
+                        (function() {
+                            // 查找登录按钮（多种可能的选择器）
+                            const selectors = [
+                                '.login-button',
+                                'button.login-button',
+                                '.header-buttons .login-button',
+                                'a.login-button',
+                                '[class*="login"]',
+                                'button:contains("登录")',
+                                'a:contains("登录")'
+                            ];
+                            for (const sel of selectors) {
+                                try {
+                                    const btn = document.querySelector(sel);
+                                    if (btn && btn.offsetParent !== null) {
+                                        btn.click();
+                                        return 'clicked: ' + sel;
+                                    }
+                                } catch (e) {}
+                            }
+                            
+                            // 备用：查找包含"登录"文字的按钮
+                            const allButtons = document.querySelectorAll('button, a');
+                            for (const btn of allButtons) {
+                                const text = (btn.innerText || '').trim();
+                                if (text === '登录' || text === 'Log In' || text === 'Login') {
+                                    btn.click();
+                                    return 'clicked text: ' + text;
+                                }
+                            }
+                            return null;
+                        })()
+                    """)
+                    if clicked:
+                        logger.info(f"[{self.account_name}] {clicked}")
+                        await asyncio.sleep(2)
+                except Exception as e:
+                    logger.debug(f"[{self.account_name}] 点击登录按钮失败: {e}")
+            
             await asyncio.sleep(1)
+        
+        if not login_form_found:
+            logger.error(f"[{self.account_name}] 登录表单未加载")
+            await self._save_debug_screenshot(tab, "login_form_not_found")
+            return False
 
         # 5. 使用 JS 直接赋值填写表单（参考 linuxdo.py，比 send_keys 更可靠）
         try:

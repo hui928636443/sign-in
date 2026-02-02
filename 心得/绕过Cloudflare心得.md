@@ -180,31 +180,45 @@ await tab.evaluate(f"""
 
 **现象：** 页面显示"确认您是真人"复选框，需要手动点击
 
-**原因：** Cloudflare Turnstile 是一种交互式验证，复选框在 iframe 中，普通 JavaScript 无法直接访问
+**原因：** Cloudflare Turnstile 是一种交互式验证。**重要发现：2025 年的 Turnstile 通常被包裹在封闭的 Shadow DOM 中**，导致：
+- `document.querySelectorAll('iframe')` 返回 0 个结果
+- 传统的 querySelector 无法访问内部元素
+- 必须通过定位外层容器 + 坐标点击来解决
 
-**解决方案：** 使用坐标点击
+**解决方案：** 定位 `.cf-turnstile` 容器，然后坐标点击
 
 ```python
 async def click_turnstile(tab):
-    """点击 Cloudflare Turnstile 复选框"""
-    # 1. 获取 Turnstile iframe 的位置
-    iframe_rect = await tab.evaluate(r"""
+    """点击 Cloudflare Turnstile 复选框（支持 Shadow DOM）"""
+    # 1. 获取 Turnstile 容器的位置（不是 iframe！）
+    container_rect = await tab.evaluate(r"""
         (function() {
-            const iframes = document.querySelectorAll('iframe[src*="challenges.cloudflare.com"]');
-            for (const iframe of iframes) {
-                const rect = iframe.getBoundingClientRect();
-                if (rect.width > 0 && rect.height > 0) {
-                    return { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
+            // 优先查找容器（即使 iframe 在 Shadow DOM 中不可见）
+            const containerSelectors = [
+                '.cf-turnstile',
+                'div[data-sitekey]',
+                '#turnstile-wrapper',
+                'div[id*="turnstile"]',
+                'div[class*="turnstile"]'
+            ];
+            for (const sel of containerSelectors) {
+                const container = document.querySelector(sel);
+                if (container) {
+                    const rect = container.getBoundingClientRect();
+                    if (rect.width > 0 && rect.height > 0) {
+                        return { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
+                    }
                 }
             }
             return null;
         })()
     """)
     
-    if iframe_rect:
-        # 2. 复选框通常在 iframe 左上角偏移约 (30, 25) 的位置
-        click_x = iframe_rect["x"] + 30
-        click_y = iframe_rect["y"] + 25
+    if container_rect:
+        # 2. 复选框位置：容器左上角偏移约 (40, 40) 像素
+        # 这是 Turnstile 复选框的标准位置
+        click_x = container_rect["x"] + 40
+        click_y = container_rect["y"] + 40
         
         # 3. 使用 nodriver 的 mouse_click 点击坐标
         await tab.mouse_click(click_x, click_y)
@@ -213,25 +227,38 @@ async def click_turnstile(tab):
 
 **检测 Turnstile 页面的方法：**
 ```python
-# 检查页面是否有 Turnstile 验证
-has_turnstile = await tab.evaluate(r"""
+# 检查页面是否有 Turnstile 验证（支持 Shadow DOM 场景）
+turnstile_info = await tab.evaluate(r"""
     (function() {
-        // 检查是否有 Turnstile iframe
-        const iframes = document.querySelectorAll('iframe[src*="challenges.cloudflare.com"]');
-        if (iframes.length > 0) return true;
+        const result = { hasContainer: false, hasText: false };
+        
+        // 检查容器（关键：即使 iframe 不可见，容器通常可见）
+        const containerSelectors = ['.cf-turnstile', 'div[data-sitekey]', '#turnstile-wrapper'];
+        for (const sel of containerSelectors) {
+            if (document.querySelector(sel)) {
+                result.hasContainer = true;
+                break;
+            }
+        }
         
         // 检查页面文字
         const bodyText = document.body?.innerText || '';
         const cfTexts = ['确认您是真人', '验证您是真人', 'verify you are human'];
-        return cfTexts.some(t => bodyText.toLowerCase().includes(t.toLowerCase()));
+        result.hasText = cfTexts.some(t => bodyText.toLowerCase().includes(t.toLowerCase()));
+        
+        return result;
     })()
 """)
+has_turnstile = turnstile_info["hasContainer"] or turnstile_info["hasText"]
 ```
 
 **注意事项：**
-- Turnstile 复选框位置是固定的，通常在 iframe 左上角偏移 (30, 25) 像素
-- 点击后需要等待 3-5 秒让验证处理
+- **不要依赖 iframe 检测！** 2025 年的 Turnstile 可能在封闭 Shadow DOM 中，iframe 数量为 0
+- 复选框位置是固定的，通常在容器左上角偏移 (40, 40) 像素
+- 点击后需要等待 4-5 秒让验证处理
+- 可以多次尝试点击（最多 3 次），因为第一次可能没点中
 - 如果点击后一直转圈，可能是浏览器指纹被标记，需要更换 IP 或优化指纹
+- 避免直接点击 input 元素，点击 span 或容器区域更隐蔽
 
 ---
 
