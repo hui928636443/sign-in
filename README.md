@@ -1,46 +1,108 @@
-# 个人学习项目
-## 还在开发中
+# Sign-in 自动签到工具
 
-## LinuxDO 配置说明
+自动签到和浏览工具，支持多个 NewAPI 公益站签到和 LinuxDO 论坛浏览。
 
-### 登录方式
+## ✨ 功能特性
 
-支持三种登录方式（按优先级）：
+- 🔄 **NewAPI 站点签到** - 支持 13+ 个公益站自动签到
+- 📖 **LinuxDO 浏览** - 模拟真实用户浏览行为，支持 Cloudflare 绕过
+- 📬 **多渠道通知** - 支持邮件、微信、Telegram、钉钉等 11 种通知方式
+- ⏰ **定时运行** - GitHub Actions 自动运行（NewAPI）或本地定时任务（LinuxDO）
 
-1. **Cookie 模式**（推荐，最稳定）
-2. **缓存 Cookie**（自动保存上次登录的 Cookie）
-3. **浏览器登录**（用户名密码）
+## 🚀 快速开始
 
-### 配置示例
+### NewAPI 签到（GitHub Actions）
+
+1. Fork 本仓库
+2. 在 Settings → Secrets → Actions 中添加 `NEWAPI_ACCOUNTS`
+3. 配置通知渠道（可选）
+4. GitHub Actions 会自动运行（每天 8:00 和 20:00）
+
+### LinuxDO 浏览（仅本地）
+
+> ⚠️ LinuxDO 使用 Cloudflare 防护，**仅支持本地运行**
+
+```bash
+# 安装依赖
+uv sync
+
+# 运行浏览
+uv run python main.py --platform linuxdo
+```
+
+## 📋 配置说明
+
+### NewAPI 账号配置
 
 ```json
-// LINUXDO_ACCOUNTS 环境变量
 [
   {
-    "name": "主账号",
-    "username": "your_username",
-    "password": "your_password",
-    "browse_enabled": true,
-    "level": 2
-  },
-  {
-    "name": "Cookie模式账号",
-    "cookies": "_forum_session=xxx; _t=xxx; cf_clearance=xxx",
-    "browse_enabled": true,
-    "level": 3
+    "name": "WONG公益站",
+    "provider": "wong",
+    "cookies": {"session": "xxx"},
+    "api_user": "12345"
   }
 ]
 ```
 
-### 获取 Cookie
+### LinuxDO 账号配置
 
-1. 在浏览器中登录 linux.do
-2. 按 F12 打开开发者工具
-3. 进入 Application → Cookies → linux.do
-4. 复制 `_forum_session`、`_t`、`cf_clearance` 的值
+```json
+[
+  {
+    "username": "用户名",
+    "password": "密码",
+    "browse_minutes": 20
+  }
+]
+```
 
-### Level 说明
+### 支持的 NewAPI 站点
 
-- `level: 1` - 慢速浏览，多看一些时间，浏览 10 个帖子
-- `level: 2` - 正常浏览，一般时间，浏览 7 个帖子
-- `level: 3` - 快速浏览，看一会儿就结束，浏览 5 个帖子
+| 站点 ID | 站点名称 | 域名 |
+|---------|----------|------|
+| `wong` | WONG公益站 | wzw.pp.ua |
+| `elysiver` | Elysiver | elysiver.h-e.top |
+| `kfcapi` | KFC API | kfc-api.sxxe.net |
+| `duckcoding` | Free DuckCoding | free.duckcoding.com |
+| `runanytime` | 随时跑路 | runanytime.hxi.me |
+| `neb` | NEB公益站 | ai.zzhdsgsss.xyz |
+| `techstar` | TechnologyStar | aidrouter.qzz.io |
+| `lightllm` | 轻のLLM | lightllm.online |
+| `hotaru` | Hotaru API | api.hotaruapi.top |
+| ... | 更多站点 | 见 000/看我.md |
+
+## 🔔 通知渠道
+
+支持以下通知方式（配置对应环境变量即可启用）：
+
+- 📧 邮件（QQ邮箱等）
+- 💬 PushPlus（微信推送）
+- 📱 Server酱 Turbo
+- ✈️ Telegram
+- 🔔 钉钉/飞书/企业微信
+- 🍎 Bark（iOS）
+- 更多...
+
+详细配置见 [000/看我.md](000/看我.md)
+
+## 📁 项目结构
+
+```
+sign-in/
+├── main.py                 # 主入口
+├── linuxdo_browse.py       # LinuxDO 浏览脚本
+├── linuxdo_scheduler.py    # LinuxDO 定时任务
+├── platforms/              # 各平台签到实现
+├── utils/                  # 工具函数
+├── scripts/                # 辅助脚本
+└── .github/workflows/      # GitHub Actions 配置
+```
+
+## ⚠️ 免责声明
+
+本项目仅供学习交流使用，请勿用于任何违反服务条款的行为。使用本项目产生的任何后果由使用者自行承担。
+
+## 📄 License
+
+MIT
