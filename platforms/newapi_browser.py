@@ -286,7 +286,7 @@ class NewAPIBrowserCheckin:
                                 return [w / 2 - 120, h / 2 - 20, 300, 65, 'center-fallback'];
                             })()
                         """)
-                        
+
                         # 确保返回的是数组格式，且元素是数字
                         if container_rect and isinstance(container_rect, (list, tuple)) and len(container_rect) >= 4:
                             try:
@@ -298,17 +298,17 @@ class NewAPIBrowserCheckin:
                                         # nodriver 有时返回 {'type': 'number', 'value': 123} 格式
                                         return float(val.get('value', 0))
                                     return float(val)
-                                
+
                                 x = to_float(container_rect[0])
                                 y = to_float(container_rect[1])
                                 w = to_float(container_rect[2])
                                 h = to_float(container_rect[3])
                                 selector = container_rect[4] if len(container_rect) > 4 else 'N/A'
-                                
+
                                 # 复选框位置：容器左上角偏移约 (40, 40) 像素
                                 click_x = x + 40
                                 click_y = y + 40
-                                
+
                                 logger.info(
                                     f"[{self.account_name}] 发现 Turnstile 容器 "
                                     f"(selector: {selector}, size: {w:.0f}x{h:.0f}), "
@@ -334,6 +334,56 @@ class NewAPIBrowserCheckin:
         await self._save_debug_screenshot(tab, "cf_timeout")
         return False
 
+    async def _wait_for_cloudflare_with_retry(self, tab, max_retries: int = 3) -> bool:
+        """带重试的 Cloudflare 验证（核心策略：多次尝试）
+
+        根据心得文档：碰到 CF 的核心就是多尝试几次
+        使用指数退避策略：5s -> 15s -> 30s
+
+        Args:
+            tab: nodriver 标签页
+            max_retries: 最大重试次数（默认 3 次）
+
+        Returns:
+            是否通过 Cloudflare 验证
+        """
+        # 指数退避等待时间（秒）
+        retry_delays = [5, 15, 30]
+
+        for attempt in range(max_retries):
+            logger.info(f"[{self.account_name}] Cloudflare 验证尝试 {attempt + 1}/{max_retries}...")
+
+            # 第一次尝试用较长超时，后续用较短超时
+            timeout = 30 if attempt == 0 else 20
+
+            # 等待 Cloudflare 验证
+            cf_passed = await self._wait_for_cloudflare(tab, timeout=timeout)
+
+            if cf_passed:
+                if attempt > 0:
+                    logger.success(f"[{self.account_name}] 第 {attempt + 1} 次尝试通过 Cloudflare！")
+                return True
+
+            # 最后一次尝试失败，不再重试
+            if attempt >= max_retries - 1:
+                logger.error(f"[{self.account_name}] Cloudflare 验证失败，已重试 {max_retries} 次")
+                return False
+
+            # 指数退避等待
+            wait_time = retry_delays[min(attempt, len(retry_delays) - 1)]
+            logger.warning(
+                f"[{self.account_name}] Cloudflare 验证失败，"
+                f"等待 {wait_time}s 后重试（{attempt + 2}/{max_retries}）..."
+            )
+            await asyncio.sleep(wait_time)
+
+            # 刷新页面重新尝试
+            logger.info(f"[{self.account_name}] 刷新页面...")
+            await tab.reload()
+            await asyncio.sleep(3)  # 等待页面开始加载
+
+        return False
+
     async def _login_linuxdo(self, tab) -> bool:
         """登录 LinuxDO（参考 linuxdo.py 的成功实现，使用 JS 直接赋值）
         
@@ -345,16 +395,12 @@ class NewAPIBrowserCheckin:
         await tab.get(self.LINUXDO_URL)
         await self._log_page_info(tab, "linuxdo_home")
 
-        # 2. 等待 Cloudflare 挑战完成
-        cf_passed = await self._wait_for_cloudflare(tab, timeout=30)
+        # 2. 等待 Cloudflare 挑战完成（多次重试策略）
+        cf_passed = await self._wait_for_cloudflare_with_retry(tab, max_retries=3)
         if not cf_passed:
-            logger.info(f"[{self.account_name}] 尝试刷新页面...")
-            await tab.reload()
-            cf_passed = await self._wait_for_cloudflare(tab, timeout=20)
-            if not cf_passed:
-                logger.error(f"[{self.account_name}] Cloudflare 验证失败")
-                await self._save_debug_screenshot(tab, "linuxdo_cf_failed")
-                return False
+            logger.error(f"[{self.account_name}] Cloudflare 验证失败")
+            await self._save_debug_screenshot(tab, "linuxdo_cf_failed")
+            return False
 
         # 检查是否已经登录
         try:
@@ -374,7 +420,7 @@ class NewAPIBrowserCheckin:
         # 3. 访问登录页面（Discourse 会自动弹出登录模态框）
         logger.info(f"[{self.account_name}] 访问登录页面...")
         await tab.get(self.LINUXDO_LOGIN_URL)
-        
+
         # 等待页面加载完成
         await asyncio.sleep(3)
         await self._log_page_info(tab, "linuxdo_login_page")
@@ -395,7 +441,7 @@ class NewAPIBrowserCheckin:
                     break
             except Exception:
                 pass
-            
+
             # 如果表单没出现，尝试点击登录按钮触发模态框
             if attempt == 5:
                 logger.info(f"[{self.account_name}] 尝试点击登录按钮触发模态框...")
@@ -439,9 +485,9 @@ class NewAPIBrowserCheckin:
                         await asyncio.sleep(2)
                 except Exception as e:
                     logger.debug(f"[{self.account_name}] 点击登录按钮失败: {e}")
-            
+
             await asyncio.sleep(1)
-        
+
         if not login_form_found:
             logger.error(f"[{self.account_name}] 登录表单未加载")
             await self._save_debug_screenshot(tab, "login_form_not_found")

@@ -44,9 +44,8 @@ class LinuxDOAdapter(BasePlatformAdapter):
         self,
         username: str | None = None,
         password: str | None = None,
-        browse_count: int = 10,
         account_name: str | None = None,
-        level: int = 2,
+        browse_minutes: int = 20,
         cookies: dict | str | None = None,
     ):
         """初始化 LinuxDO 适配器
@@ -54,19 +53,14 @@ class LinuxDOAdapter(BasePlatformAdapter):
         Args:
             username: LinuxDO 用户名（Cookie 模式可选）
             password: LinuxDO 密码（Cookie 模式可选）
-            browse_count: 浏览帖子数量（默认 10）
             account_name: 账号显示名称
-            level: 账号等级 1-3，影响浏览时间
-                   L1: 多看一些时间（慢速浏览）
-                   L2: 一般时间（正常浏览）
-                   L3: 快速浏览
+            browse_minutes: 浏览时长（分钟，默认 20）
             cookies: 预设的 Cookie（优先使用，跳过浏览器登录）
         """
         self.username = username
         self.password = password
-        self.browse_count = browse_count
         self._account_name = account_name or username or "LinuxDO"
-        self.level = max(1, min(3, level))  # 限制在 1-3 范围
+        self.browse_minutes = browse_minutes
         self._preset_cookies = self._parse_cookies(cookies)
 
         self._browser_manager: BrowserManager | None = None
@@ -320,6 +314,56 @@ class LinuxDOAdapter(BasePlatformAdapter):
         logger.warning(f"[{self.account_name}] 等待 Cloudflare 超时 ({timeout}s)")
         return False
 
+    async def _wait_for_cloudflare_with_retry(self, tab, max_retries: int = 3) -> bool:
+        """带重试的 Cloudflare 验证（核心策略：多次尝试）
+
+        根据心得文档：碰到 CF 的核心就是多尝试几次
+        使用指数退避策略：5s -> 15s -> 30s
+
+        Args:
+            tab: nodriver 标签页
+            max_retries: 最大重试次数（默认 3 次）
+
+        Returns:
+            是否通过 Cloudflare 验证
+        """
+        # 指数退避等待时间（秒）
+        retry_delays = [5, 15, 30]
+
+        for attempt in range(max_retries):
+            logger.info(f"[{self.account_name}] Cloudflare 验证尝试 {attempt + 1}/{max_retries}...")
+
+            # 第一次尝试用较长超时，后续用较短超时
+            timeout = 30 if attempt == 0 else 20
+
+            # 等待 Cloudflare 验证
+            cf_passed = await self._wait_for_cloudflare_nodriver(tab, timeout=timeout)
+
+            if cf_passed:
+                if attempt > 0:
+                    logger.success(f"[{self.account_name}] 第 {attempt + 1} 次尝试通过 Cloudflare！")
+                return True
+
+            # 最后一次尝试失败，不再重试
+            if attempt >= max_retries - 1:
+                logger.error(f"[{self.account_name}] Cloudflare 验证失败，已重试 {max_retries} 次")
+                return False
+
+            # 指数退避等待
+            wait_time = retry_delays[min(attempt, len(retry_delays) - 1)]
+            logger.warning(
+                f"[{self.account_name}] Cloudflare 验证失败，"
+                f"等待 {wait_time}s 后重试（{attempt + 2}/{max_retries}）..."
+            )
+            await asyncio.sleep(wait_time)
+
+            # 刷新页面重新尝试
+            logger.info(f"[{self.account_name}] 刷新页面...")
+            await tab.reload()
+            await asyncio.sleep(3)  # 等待页面开始加载
+
+        return False
+
     async def _login_nodriver(self) -> bool:
         """使用 nodriver 登录（优化版本，支持 GitHub Actions）"""
         tab = self._browser_manager.page
@@ -328,16 +372,11 @@ class LinuxDOAdapter(BasePlatformAdapter):
         logger.info(f"[{self.account_name}] 访问 LinuxDO 首页...")
         await tab.get(self.BASE_URL)
 
-        # 2. 等待 Cloudflare 挑战完成
-        cf_passed = await self._wait_for_cloudflare_nodriver(tab, timeout=30)
+        # 2. 等待 Cloudflare 挑战完成（多次重试策略）
+        cf_passed = await self._wait_for_cloudflare_with_retry(tab, max_retries=3)
         if not cf_passed:
-            # 尝试刷新页面
-            logger.info(f"[{self.account_name}] 尝试刷新页面...")
-            await tab.reload()
-            cf_passed = await self._wait_for_cloudflare_nodriver(tab, timeout=20)
-            if not cf_passed:
-                logger.error(f"[{self.account_name}] Cloudflare 验证失败")
-                return False
+            logger.error(f"[{self.account_name}] Cloudflare 验证失败")
+            return False
 
         # 3. 访问登录页面
         logger.info(f"[{self.account_name}] 访问登录页面...")
@@ -641,11 +680,11 @@ class LinuxDOAdapter(BasePlatformAdapter):
                         platform=self.platform_name,
                         account=self.account_name,
                         status=CheckinStatus.SUCCESS,
-                        message=f"成功浏览 {browsed} 个帖子，点赞 {self._likes_given} 次（L{self.level}）",
+                        message=f"成功浏览 {browsed} 个帖子，点赞 {self._likes_given} 次",
                         details={
                             "browsed": browsed,
                             "likes": self._likes_given,
-                            "level": self.level,
+                            "browse_minutes": self.browse_minutes,
                             "mode": "browser",
                         },
                     )
@@ -662,8 +701,8 @@ class LinuxDOAdapter(BasePlatformAdapter):
                 message="获取帖子列表失败",
             )
 
-        # 随机选择帖子浏览
-        browse_count = min(self.browse_count, len(topics))
+        # 随机选择帖子浏览（API 模式固定浏览 10 个）
+        browse_count = min(10, len(topics))
         selected_topics = random.sample(topics, browse_count)
 
         logger.info(f"[{self.account_name}] 将浏览 {browse_count} 个帖子（API 模式）")
@@ -725,25 +764,20 @@ class LinuxDOAdapter(BasePlatformAdapter):
         tab = self._browser_manager.page
         browsed_count = 0
 
-        # 根据 level 设置总浏览时长（分钟）
-        level_duration = {
-            1: 60,  # L1: 1 小时
-            2: 30,  # L2: 30 分钟
-            3: 15,  # L3: 15 分钟
-        }
-        total_minutes = level_duration.get(self.level, 30)
+        # 使用 browse_minutes 设置总浏览时长
+        total_minutes = self.browse_minutes
         total_seconds = total_minutes * 60
 
         # 浏览配置 - 模拟真实用户行为
         config = {
-            "scroll_delay": (5, 8),   # 每次滚动间隔 5-8 秒
+            "scroll_delay": (3, 6),   # 每次滚动间隔 3-6 秒
             "like_chance": 0.3,       # 30% 概率点赞
             "scroll_back_chance": 0.2,  # 20% 概率回滚（模拟回看）
         }
 
         logger.info(
-            f"[{self.account_name}] 浏览模式: L{self.level} "
-            f"(总时长: {total_minutes} 分钟, 滚动间隔: {config['scroll_delay'][0]}-{config['scroll_delay'][1]}s)"
+            f"[{self.account_name}] 浏览模式: {total_minutes} 分钟 "
+            f"(滚动间隔: {config['scroll_delay'][0]}-{config['scroll_delay'][1]}s)"
         )
 
         # 记录开始时间

@@ -2,8 +2,8 @@ name: LinuxDO Browse & Check-in
 
 on:
   schedule:
-    # 每天 3 次：北京时间 5点、8点、22点
-    - cron: '0 21,0,14 * * *'
+    # 每天 3 次：24小时平均分配，北京时间 0点、8点、16点
+    - cron: '0 16,0,8 * * *'
 
   workflow_dispatch:
     inputs:

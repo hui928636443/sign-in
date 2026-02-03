@@ -282,12 +282,7 @@ class LinuxDOAccount:
     - cookies: Cookie 字典或字符串（可选，优先使用）
         - 支持格式：{"_forum_session": "xxx", "_t": "xxx"} 或 "_forum_session=xxx; _t=xxx"
     - name: 账号显示名称（可选）
-    - browse_enabled / browse_linuxdo: 是否浏览帖子（可选，默认 True）
-    - browse_count: 浏览帖子数量（可选，默认根据 level 计算）
-    - level: 浏览等级 1-3（可选，默认 2）
-        - L1: 慢速浏览，多看一些时间，浏览 10 个帖子
-        - L2: 正常浏览，一般时间，浏览 7 个帖子
-        - L3: 快速浏览，看一会儿就结束，浏览 5 个帖子
+    - browse_minutes: 浏览时长（分钟，可选，默认 20）
     - sites: 要签到的站点列表（可选，默认空，仅浏览主站）
     """
 
@@ -295,9 +290,7 @@ class LinuxDOAccount:
     password: str | None = None
     cookies: dict | str | None = None  # Cookie 优先登录
     sites: list[str] = field(default_factory=list)  # 默认不签到任何站点，仅浏览主站
-    browse_linuxdo: bool = True  # 是否浏览 LinuxDO 帖子
-    browse_count: int = 7  # 浏览帖子数量
-    level: int = 2  # 浏览等级 1-3
+    browse_minutes: int = 20  # 浏览时长（分钟），默认 20 分钟
     name: str | None = None
 
     @classmethod
@@ -307,16 +300,8 @@ class LinuxDOAccount:
         # 默认不签到任何站点（仅浏览主站）
         sites = data.get("sites", [])
 
-        # 支持 browse_enabled 或 browse_linuxdo 字段
-        browse_linuxdo = data.get("browse_enabled", data.get("browse_linuxdo", True))
-
-        # level 字段：1-3，影响浏览速度和时间
-        # L1: 慢速（多看），L2: 正常，L3: 快速
-        level = max(1, min(3, data.get("level", 2)))
-
-        # 根据 level 计算默认浏览数量：L1=10, L2=7, L3=5
-        level_browse_count = {1: 10, 2: 7, 3: 5}
-        browse_count = data.get("browse_count", level_browse_count.get(level, 7))
+        # browse_minutes 默认 20 分钟
+        browse_minutes = data.get("browse_minutes", 20)
 
         # 获取 cookies（支持字典或字符串格式）
         cookies = data.get("cookies")
@@ -326,9 +311,7 @@ class LinuxDOAccount:
             password=data.get("password"),
             cookies=cookies,
             sites=sites,
-            browse_linuxdo=browse_linuxdo,
-            browse_count=browse_count,
-            level=level,
+            browse_minutes=browse_minutes,
             name=name,
         )
 
@@ -440,6 +423,7 @@ DEFAULT_PROVIDERS: dict[str, dict] = {
     "elysiver": {
         "domain": "https://elysiver.h-e.top",
         "sign_in_path": "/api/user/checkin",
+        "bypass_method": "browser_oauth",  # 需要浏览器 OAuth 登录绕过 Cloudflare
     },
     "kfcapi": {
         "domain": "https://kfc-api.sxxe.net",
@@ -728,9 +712,7 @@ class AppConfig:
     def _load_anyrouter_accounts(cls) -> list[AnyRouterAccount]:
         """从环境变量加载 NewAPI 站点账号配置
 
-        支持两个环境变量（优先级从高到低）：
-        1. NEWAPI_ACCOUNTS - 新的统一配置名
-        2. ANYROUTER_ACCOUNTS - 兼容旧配置
+        环境变量：NEWAPI_ACCOUNTS
 
         JSON 格式示例:
         [
@@ -742,8 +724,7 @@ class AppConfig:
             }
         ]
         """
-        # 优先使用 NEWAPI_ACCOUNTS，兼容 ANYROUTER_ACCOUNTS
-        accounts_str = os.getenv("NEWAPI_ACCOUNTS") or os.getenv("ANYROUTER_ACCOUNTS")
+        accounts_str = os.getenv("NEWAPI_ACCOUNTS")
         if not accounts_str:
             return []
 

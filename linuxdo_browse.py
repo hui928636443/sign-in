@@ -81,18 +81,12 @@ async def main():
         logger.info("-" * 40)
         logger.info(f"处理账号 [{i + 1}/{len(config.linuxdo_accounts)}]: {account.get_display_name(i)}")
 
-        # 检查是否启用浏览
-        if not account.browse_linuxdo:
-            logger.info(f"账号 {account.get_display_name(i)} 已禁用浏览，跳过")
-            continue
-
         # 打印账号配置（隐藏敏感信息）
         has_cookies = bool(account.cookies)
         has_credentials = bool(account.username and account.password)
         logger.info(f"  - 有 Cookie: {has_cookies}")
         logger.info(f"  - 有用户名密码: {has_credentials}")
-        logger.info(f"  - 浏览数量: {account.browse_count}")
-        logger.info(f"  - 等级: L{account.level}")
+        logger.info(f"  - 浏览时长: {account.browse_minutes} 分钟")
 
         # 获取 cookies
         cookies = account.cookies if account.cookies else None
@@ -101,9 +95,8 @@ async def main():
             username=account.username,
             password=account.password,
             cookies=cookies,
-            browse_count=account.browse_count,
             account_name=account.get_display_name(i),
-            level=account.level,
+            browse_minutes=account.browse_minutes,
         )
 
         try:

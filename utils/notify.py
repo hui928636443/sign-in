@@ -177,12 +177,15 @@ class NotificationManager:
         环境变量:
         - EMAIL_USER: 发件邮箱账号
         - EMAIL_PASS: 发件邮箱密码/授权码
-        - EMAIL_TO: 收件邮箱地址
+        - EMAIL_TO: 收件邮箱地址（可选，默认发送到 EMAIL_USER）
         - EMAIL_SENDER: 发件人显示名称（可选）
         - CUSTOM_SMTP_SERVER: 自定义 SMTP 服务器（可选）
         """
-        if not self.email_user or not self.email_pass or not self.email_to:
+        if not self.email_user or not self.email_pass:
             raise ValueError("Email 配置不完整")
+
+        # 收件人默认为发件人
+        email_to = self.email_to or self.email_user
 
         # 发件人显示名称
         sender_name = self.email_sender if self.email_sender else "Github自动签到"
@@ -201,7 +204,7 @@ class NotificationManager:
 
         # 使用 formataddr + Header 正确编码中文发件人名称 (RFC5322 兼容)
         msg["From"] = formataddr((Header(sender_name, "utf-8").encode(), self.email_user))
-        msg["To"] = self.email_to
+        msg["To"] = email_to
         msg["Subject"] = Header(title, "utf-8")
 
         # 确定 SMTP 服务器
@@ -213,7 +216,7 @@ class NotificationManager:
         # 发送邮件
         with smtplib.SMTP_SSL(smtp_server, 465) as server:
             server.login(self.email_user, self.email_pass)
-            server.sendmail(self.email_user, [self.email_to], msg.as_string())
+            server.sendmail(self.email_user, [email_to], msg.as_string())
 
     def _send_gotify(
         self,
