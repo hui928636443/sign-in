@@ -10,6 +10,7 @@
 - 支持 401/403 失败后自动使用浏览器 OAuth 重试
 """
 
+import json
 import ssl
 import tempfile
 
@@ -18,14 +19,15 @@ from loguru import logger
 
 from platforms.base import CheckinResult, CheckinStatus
 from platforms.linuxdo import LinuxDOAdapter
-from utils.config import DEFAULT_PROVIDERS, AppConfig
+from utils.config import DEFAULT_PROVIDERS, AnyRouterAccount, AppConfig
+from utils.cookie_cache import CookieCache
 from utils.notify import NotificationManager
 
 
 def _create_ssl_context() -> ssl.SSLContext:
     """创建兼容旧服务器的 SSL 上下文"""
     ctx = ssl.create_default_context()
-    ctx.set_ciphers('DEFAULT')
+    ctx.set_ciphers('DEFAULT@SECLEVEL=1')
     ctx.options |= 0x4  # ssl.OP_LEGACY_SERVER_CONNECT
     ctx.check_hostname = False
     ctx.verify_mode = ssl.CERT_NONE
@@ -39,6 +41,8 @@ class PlatformManager:
         self.config = config
         self.notify = NotificationManager()
         self.results: list[CheckinResult] = []
+        # Cookie 缓存：OAuth 成功后自动保存，下次优先使用 Cookie+API（更快）
+        self._cookie_cache = CookieCache()
         # 缓存 LinuxDO 账户，用于浏览器回退登录
         self._linuxdo_accounts: list[dict] = []
         self._load_linuxdo_accounts()
@@ -157,6 +161,41 @@ class PlatformManager:
 
             logger.info(f"开始签到: {account_name} ({provider_name})")
 
+            # ===== 优先尝试缓存的 Cookie（OAuth 成功后自动保存的） =====
+            cached = self._cookie_cache.get(provider_name, account_name)
+            if cached:
+                logger.info(f"[{account_name}] 发现缓存Cookie，优先尝试Cookie+API方式...")
+                try:
+                    cached_account = AnyRouterAccount(
+                        cookies={"session": cached["session"]},
+                        api_user=cached["api_user"],
+                        provider=account.provider,
+                        name=account.name,
+                    )
+                    result = await self._checkin_newapi(cached_account, provider, account_name)
+
+                    if result.status == CheckinStatus.SUCCESS:
+                        # 缓存 Cookie 有效，签到成功
+                        result.message = f"{result.message} (缓存Cookie)"
+                        if result.details is None:
+                            result.details = {}
+                        result.details["login_method"] = "cached_cookie"
+                        results.append(result)
+                        logger.success(f"[{account_name}] 使用缓存Cookie签到成功！")
+                        continue
+
+                    # 检查是否是 Cookie 过期，需要清除缓存
+                    msg = result.message or ""
+                    if "401" in msg or "403" in msg or "过期" in msg:
+                        logger.warning(f"[{account_name}] 缓存Cookie已失效，清除缓存")
+                        self._cookie_cache.invalidate(provider_name, account_name)
+                    else:
+                        logger.warning(f"[{account_name}] 缓存Cookie签到失败: {msg}")
+                except Exception as e:
+                    logger.warning(f"[{account_name}] 使用缓存Cookie签到异常: {e}")
+                    self._cookie_cache.invalidate(provider_name, account_name)
+            # ===== 缓存检查结束 =====
+
             # 检查是否需要直接使用浏览器 OAuth（某些站点有 Cloudflare 保护）
             if provider.bypass_method == "browser_oauth":
                 logger.info(f"[{account_name}] 站点需要浏览器 OAuth 登录")
@@ -249,6 +288,18 @@ class PlatformManager:
 
                 if result.status == CheckinStatus.SUCCESS:
                     logger.success(f"[{account_name}] 浏览器回退签到成功！")
+
+                    # 缓存 OAuth 获取的新 Cookie，下次直接用 Cookie+API（更快）
+                    if result.details:
+                        cached_session = result.details.pop("_cached_session", None)
+                        cached_api_user = result.details.pop("_cached_api_user", None)
+                        if cached_session and cached_api_user:
+                            self._cookie_cache.save(
+                                provider.name, account_name, cached_session, cached_api_user
+                            )
+                            logger.success(
+                                f"[{account_name}] 新Cookie已缓存，下次将优先使用Cookie+API方式"
+                            )
                 else:
                     logger.error(f"[{account_name}] 浏览器回退签到失败: {result.message}")
 
@@ -305,6 +356,11 @@ class PlatformManager:
                 logger.warning(f"[{account_name}] 无法获取 WAF cookies，尝试直接请求")
 
         ssl_ctx = _create_ssl_context()
+
+        # 对需要 WAF bypass 的站点使用浏览器直接请求（CDN 阻止非浏览器 TLS）
+        if provider.needs_waf_cookies():
+            return await self._checkin_newapi_browser(provider, account_name, headers, cookies, details)
+
         async with httpx.AsyncClient(timeout=30.0, verify=ssl_ctx) as client:
             # 1. 获取用户信息
             user_info_url = f"{provider.domain}{provider.user_info_path}"
@@ -405,6 +461,165 @@ class PlatformManager:
                     message="签到成功（自动触发）",
                     details=details if details else None,
                 )
+
+    async def _checkin_newapi_browser(
+        self, provider, account_name: str, headers: dict, cookies: dict, details: dict,
+    ) -> CheckinResult:
+        """使用 Patchright 浏览器执行签到（绕过 CDN TLS 指纹检测）"""
+        try:
+            from patchright.async_api import async_playwright
+        except ImportError:
+            from playwright.async_api import async_playwright
+
+        async with async_playwright() as p:
+            browser = await p.chromium.launch(headless=True)
+            try:
+                context = await browser.new_context()
+
+                # 注入 session cookie 和 WAF cookies
+                browser_cookies = []
+                domain = provider.domain.replace("https://", "").replace("http://", "")
+                for name, value in cookies.items():
+                    browser_cookies.append({
+                        "name": name, "value": value,
+                        "domain": domain, "path": "/",
+                    })
+                await context.add_cookies(browser_cookies)
+
+                page = await context.new_page()
+                # 先访问站点让 WAF cookies 生效
+                await page.goto(f"{provider.domain}/login", wait_until="networkidle")
+
+                # 构建 fetch headers（排除浏览器自动管理的头）
+                fetch_headers = {
+                    "Accept": "application/json, text/plain, */*",
+                    provider.api_user_key: headers.get(provider.api_user_key, ""),
+                }
+
+                # 1. 获取用户信息
+                user_info_path = provider.user_info_path
+                try:
+                    resp = await page.evaluate(f"""
+                        async () => {{
+                            const r = await fetch('{user_info_path}', {{
+                                headers: {json.dumps(fetch_headers)}
+                            }});
+                            return {{ status: r.status, text: await r.text() }};
+                        }}
+                    """)
+                    if resp["status"] == 200:
+                        try:
+                            data = json.loads(resp["text"])
+                            if data.get("success"):
+                                user_data = data.get("data", {})
+                                quota = round(user_data.get("quota", 0) / 500000, 2)
+                                used_quota = round(user_data.get("used_quota", 0) / 500000, 2)
+                                details["balance"] = f"${quota}"
+                                details["used"] = f"${used_quota}"
+                                logger.info(f"[{account_name}] 余额: ${quota}, 已用: ${used_quota}")
+                        except json.JSONDecodeError:
+                            pass
+                    else:
+                        logger.warning(f"[{account_name}] 获取用户信息失败: HTTP {resp['status']}")
+                except Exception as e:
+                    logger.warning(f"[{account_name}] 获取用户信息失败: {e}")
+
+                # 2. 执行签到（如果需要）
+                if provider.needs_manual_check_in():
+                    sign_in_path = provider.sign_in_path
+                    try:
+                        resp = await page.evaluate(f"""
+                            async () => {{
+                                const r = await fetch('{sign_in_path}', {{
+                                    method: 'POST',
+                                    headers: {json.dumps(fetch_headers)}
+                                }});
+                                return {{ status: r.status, text: await r.text() }};
+                            }}
+                        """)
+                        logger.debug(f"[{account_name}] 签到响应: {resp['status']}")
+
+                        if resp["status"] == 200:
+                            try:
+                                result = json.loads(resp["text"])
+                                msg = result.get("message") or result.get("msg") or ""
+                                if result.get("success") or result.get("ret") == 1 or result.get("code") == 0:
+                                    msg = msg or "签到成功"
+                                    logger.success(f"[{account_name}] {msg}")
+                                    return CheckinResult(
+                                        platform=f"NewAPI ({provider.name})",
+                                        account=account_name,
+                                        status=CheckinStatus.SUCCESS,
+                                        message=msg,
+                                        details=details if details else None,
+                                    )
+                                elif "已签到" in msg or "已经签到" in msg:
+                                    logger.success(f"[{account_name}] {msg}")
+                                    return CheckinResult(
+                                        platform=f"NewAPI ({provider.name})",
+                                        account=account_name,
+                                        status=CheckinStatus.SUCCESS,
+                                        message=msg,
+                                        details=details if details else None,
+                                    )
+                                else:
+                                    error_msg = msg or "签到失败"
+                                    logger.warning(f"[{account_name}] {error_msg}")
+                                    return CheckinResult(
+                                        platform=f"NewAPI ({provider.name})",
+                                        account=account_name,
+                                        status=CheckinStatus.FAILED,
+                                        message=error_msg,
+                                        details=details if details else None,
+                                    )
+                            except json.JSONDecodeError:
+                                if "success" in resp["text"].lower():
+                                    return CheckinResult(
+                                        platform=f"NewAPI ({provider.name})",
+                                        account=account_name,
+                                        status=CheckinStatus.SUCCESS,
+                                        message="签到成功",
+                                        details=details if details else None,
+                                    )
+
+                        logger.error(f"[{account_name}] 签到失败: HTTP {resp['status']}")
+                        return CheckinResult(
+                            platform=f"NewAPI ({provider.name})",
+                            account=account_name,
+                            status=CheckinStatus.FAILED,
+                            message=f"HTTP {resp['status']}",
+                            details=details if details else None,
+                        )
+                    except Exception as e:
+                        logger.error(f"[{account_name}] 签到请求异常: {e}")
+                        return CheckinResult(
+                            platform=f"NewAPI ({provider.name})",
+                            account=account_name,
+                            status=CheckinStatus.FAILED,
+                            message=f"请求异常: {str(e)}",
+                            details=details if details else None,
+                        )
+                else:
+                    # 自动签到 — 用户信息获取成功即视为签到完成
+                    if details:
+                        logger.success(f"[{account_name}] 签到成功（自动触发）")
+                        return CheckinResult(
+                            platform=f"NewAPI ({provider.name})",
+                            account=account_name,
+                            status=CheckinStatus.SUCCESS,
+                            message="签到成功（自动触发）",
+                            details=details,
+                        )
+                    else:
+                        logger.warning(f"[{account_name}] 无法确认签到状态（用户信息获取失败）")
+                        return CheckinResult(
+                            platform=f"NewAPI ({provider.name})",
+                            account=account_name,
+                            status=CheckinStatus.FAILED,
+                            message="无法确认签到状态",
+                        )
+            finally:
+                await browser.close()
 
     def _extract_session_cookie(self, cookies) -> str:
         """从 cookies 中提取 session 值"""

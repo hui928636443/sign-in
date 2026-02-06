@@ -47,3 +47,4 @@ accounts.json
 
 # Cookie 缓存（包含敏感信息）
 .linuxdo_cookies/
+.newapi_cookies/

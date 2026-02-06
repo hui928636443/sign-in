@@ -49,6 +49,15 @@ jobs:
       - name: Install Patchright browsers
         run: uv run patchright install chromium
       
+      # 恢复 Cookie 缓存（OAuth 成功后自动保存的 Cookie，下次直接用 Cookie+API 更快）
+      - name: Restore cookie cache
+        uses: actions/cache@v4
+        with:
+          path: .newapi_cookies
+          key: newapi-cookies-${{ github.run_id }}
+          restore-keys: |
+            newapi-cookies-
+      
       # 执行签到（使用 xvfb-run 模拟显示器）
       - name: Execute multi-platform check-in
         env:

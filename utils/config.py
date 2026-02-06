@@ -412,7 +412,7 @@ class ProviderConfig:
 DEFAULT_PROVIDERS: dict[str, dict] = {
     "anyrouter": {
         "domain": "https://anyrouter.top",
-        "sign_in_path": None,  # anyrouter 自动签到，不需要调用签到 API
+        "sign_in_path": None,  # anyrouter 无签到 API，通过浏览器访问用户信息页触发自动签到
         "bypass_method": "waf_cookies",
         "waf_cookie_names": ["acw_tc", "cdn_sec_tc", "acw_sc__v2"],
     },
@@ -472,7 +472,7 @@ DEFAULT_PROVIDERS: dict[str, dict] = {
     },
     "agentrouter": {
         "domain": "https://agentrouter.org",
-        "sign_in_path": None,  # 自动签到，无需手动调用
+        "sign_in_path": None,  # 同 anyrouter，无签到 API
         "bypass_method": "waf_cookies",
         "waf_cookie_names": ["acw_tc"],
     },

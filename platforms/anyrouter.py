@@ -28,7 +28,7 @@ def _create_ssl_context() -> ssl.SSLContext:
     """
     ctx = ssl.create_default_context()
     # 允许 OpenSSL 默认的所有算法，包括旧算法
-    ctx.set_ciphers('DEFAULT')
+    ctx.set_ciphers('DEFAULT@SECLEVEL=1')
     # 开启 OP_LEGACY_SERVER_CONNECT 以支持旧版服务器
     ctx.options |= 0x4  # ssl.OP_LEGACY_SERVER_CONNECT
     # 禁用主机名验证（AnyRouter 使用 CDN，证书可能不匹配）

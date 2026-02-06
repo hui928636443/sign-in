@@ -157,6 +157,8 @@ class NewAPIBrowserCheckin:
                         return False, f"Cookie 无效: {data.get('message')}", details
                 elif response.status_code == 401:
                     return False, "Cookie 已过期", details
+                elif response.status_code == 403:
+                    return False, "HTTP 403 被拦截(Cookie过期或Cloudflare)", details
                 else:
                     return False, f"HTTP {response.status_code}", details
 
@@ -187,142 +189,135 @@ class NewAPIBrowserCheckin:
             logger.error(f"[{self.account_name}] 签到请求失败: {e}")
             return False, f"请求失败: {e}", details
 
-    async def _wait_for_cloudflare(self, tab, timeout: int = 45) -> bool:
+    @staticmethod
+    def _to_float(val) -> float:
+        """将 nodriver 返回的值转为 float（处理 {'type': 'number', 'value': 123} 格式）"""
+        if isinstance(val, (int, float)):
+            return float(val)
+        if isinstance(val, dict):
+            return float(val.get('value', 0))
+        return float(val)
+
+    async def _wait_for_cloudflare(self, tab, timeout: int = 60) -> bool:
         """等待 Cloudflare 挑战完成（支持 5 秒盾和 Turnstile 验证）
-        
-        Turnstile 验证框通常在封闭的 Shadow DOM 中，传统 querySelector 无法访问内部元素。
-        解决方案：定位外层容器 (.cf-turnstile)，然后通过坐标点击复选框位置。
+
+        核心策略：
+        1. 先等 8 秒让非交互式挑战（5 秒盾）自动完成
+        2. 如果还在 CF 页面，通过 iframe[src*="challenges.cloudflare.com"] 精确定位 Turnstile
+        3. 点击 iframe 内 checkbox 的位置（iframe 左上角偏移约 30, 30）
+        4. 最多点击 5 次，每次间隔 5 秒等待验证结果
         """
         logger.info(f"[{self.account_name}] 检测 Cloudflare 挑战...")
         start_time = asyncio.get_event_loop().time()
         turnstile_click_count = 0
-        max_turnstile_clicks = 3  # 最多尝试点击 3 次
+        max_turnstile_clicks = 5
+        # 先等一段时间让非交互式挑战自动完成
+        initial_wait_done = False
 
         while asyncio.get_event_loop().time() - start_time < timeout:
             try:
                 title = await tab.evaluate("document.title")
-                # 检测页面标题中的 Cloudflare 特征
-                cf_indicators = ["just a moment", "checking your browser", "please wait", "verifying", "请稍候"]
                 title_lower = title.lower() if title else ""
+
+                # 检测是否仍在 Cloudflare 挑战页面
+                cf_indicators = ["just a moment", "checking your browser", "please wait", "verifying", "请稍候"]
                 is_cf_title = any(ind in title_lower for ind in cf_indicators)
 
-                # 检测页面内容中的 Cloudflare Turnstile 特征（简化版）
-                has_turnstile = await tab.evaluate(r"""
+                # 检测 Turnstile iframe 或容器是否存在
+                has_cf_element = await tab.evaluate(r"""
                     (function() {
-                        // 检查 Turnstile 容器
-                        const containerSelectors = [
-                            '.cf-turnstile',
-                            'div[data-sitekey]',
-                            '#turnstile-wrapper',
-                            'div[id*="turnstile"]',
-                            'div[class*="turnstile"]'
-                        ];
-                        for (const sel of containerSelectors) {
-                            if (document.querySelector(sel)) return true;
+                        // 方法1: 查找 Cloudflare challenges iframe（最可靠）
+                        const iframes = document.querySelectorAll('iframe');
+                        for (const iframe of iframes) {
+                            const src = iframe.src || '';
+                            if (src.includes('challenges.cloudflare.com')) return true;
                         }
-                        
-                        // 检查页面文字
+                        // 方法2: 查找 Turnstile 容器
+                        if (document.querySelector('.cf-turnstile, div[data-sitekey]')) return true;
+                        // 方法3: 查找验证文字
                         const bodyText = document.body?.innerText || '';
                         const cfTexts = ['确认您是真人', '验证您是真人', 'verify you are human'];
                         return cfTexts.some(t => bodyText.toLowerCase().includes(t.toLowerCase()));
                     })()
                 """)
 
-                is_cf_page = is_cf_title or has_turnstile
+                is_cf_page = is_cf_title or has_cf_element
 
                 if not is_cf_page and title:
                     logger.success(f"[{self.account_name}] Cloudflare 验证通过！")
                     await self._save_debug_screenshot(tab, "cf_passed")
                     return True
 
-                if is_cf_page:
-                    logger.debug(f"[{self.account_name}] 等待 Cloudflare... 标题: {title}, Turnstile: {has_turnstile}")
+                # 前 8 秒只等待，不点击（让非交互式挑战自动完成）
+                elapsed = asyncio.get_event_loop().time() - start_time
+                if not initial_wait_done and elapsed < 8:
+                    logger.debug(f"[{self.account_name}] 等待非交互式挑战自动完成... ({elapsed:.0f}s)")
+                    await asyncio.sleep(2)
+                    continue
+                initial_wait_done = True
 
-                    # 尝试点击 Turnstile 验证框
-                    if turnstile_click_count < max_turnstile_clicks:
-                        # 获取容器位置（多种方法）
-                        container_rect = await tab.evaluate(r"""
-                            (function() {
-                                // 方法1: 标准容器选择器
-                                const containerSelectors = [
-                                    '.cf-turnstile',
-                                    'div[data-sitekey]',
-                                    '#turnstile-wrapper',
-                                    '#challenge-stage',
-                                    '.challenge-container',
-                                    '.main-wrapper',
-                                    '.spacer'
-                                ];
-                                for (const sel of containerSelectors) {
-                                    const container = document.querySelector(sel);
-                                    if (container) {
-                                        const rect = container.getBoundingClientRect();
-                                        if (rect.width > 0 && rect.height > 0) {
-                                            return [rect.x, rect.y, rect.width, rect.height, sel];
-                                        }
+                if is_cf_page and turnstile_click_count < max_turnstile_clicks:
+                    # 通过 iframe 精确定位 Turnstile checkbox
+                    iframe_rect = await tab.evaluate(r"""
+                        (function() {
+                            // 优先: 查找 challenges.cloudflare.com 的 iframe
+                            const iframes = document.querySelectorAll('iframe');
+                            for (const iframe of iframes) {
+                                const src = iframe.src || '';
+                                if (src.includes('challenges.cloudflare.com')) {
+                                    const rect = iframe.getBoundingClientRect();
+                                    if (rect.width > 0 && rect.height > 0) {
+                                        return [rect.x, rect.y, rect.width, rect.height, 'cf-iframe'];
                                     }
                                 }
-                                
-                                // 方法2: 查找包含验证文字的元素
-                                const cfTexts = ['确认您是真人', '验证您是真人', 'Verify you are human'];
-                                const allElements = document.querySelectorAll('div, span, label, p');
-                                for (const el of allElements) {
-                                    const text = el.innerText || '';
-                                    for (const cfText of cfTexts) {
-                                        if (text.includes(cfText)) {
-                                            const rect = el.getBoundingClientRect();
-                                            // 找到合适大小的容器（Turnstile 通常是 300x65 左右）
-                                            if (rect.width >= 100 && rect.width <= 500 && rect.height >= 30 && rect.height <= 150) {
-                                                return [rect.x, rect.y, rect.width, rect.height, 'text-match'];
-                                            }
-                                        }
-                                    }
+                            }
+                            // 备选: .cf-turnstile 容器
+                            const container = document.querySelector('.cf-turnstile') ||
+                                              document.querySelector('div[data-sitekey]');
+                            if (container) {
+                                const rect = container.getBoundingClientRect();
+                                if (rect.width > 0 && rect.height > 0) {
+                                    return [rect.x, rect.y, rect.width, rect.height, 'cf-container'];
                                 }
-                                
-                                // 方法3: 返回页面中央位置（Turnstile 通常在页面中央）
-                                // 复选框通常在页面中央偏左的位置
-                                const w = window.innerWidth || 1920;
-                                const h = window.innerHeight || 1080;
-                                return [w / 2 - 120, h / 2 - 20, 300, 65, 'center-fallback'];
-                            })()
-                        """)
+                            }
+                            // 最后: 查找任何 Turnstile 相关的 iframe
+                            for (const iframe of iframes) {
+                                const rect = iframe.getBoundingClientRect();
+                                if (rect.width >= 200 && rect.width <= 400 &&
+                                    rect.height >= 50 && rect.height <= 100) {
+                                    return [rect.x, rect.y, rect.width, rect.height, 'size-match-iframe'];
+                                }
+                            }
+                            return null;
+                        })()
+                    """)
 
-                        # 确保返回的是数组格式，且元素是数字
-                        if container_rect and isinstance(container_rect, (list, tuple)) and len(container_rect) >= 4:
-                            try:
-                                # 提取坐标值，处理可能的类型问题
-                                def to_float(val):
-                                    if isinstance(val, (int, float)):
-                                        return float(val)
-                                    if isinstance(val, dict):
-                                        # nodriver 有时返回 {'type': 'number', 'value': 123} 格式
-                                        return float(val.get('value', 0))
-                                    return float(val)
+                    if iframe_rect and isinstance(iframe_rect, (list, tuple)) and len(iframe_rect) >= 4:
+                        try:
+                            x = self._to_float(iframe_rect[0])
+                            y = self._to_float(iframe_rect[1])
+                            w = self._to_float(iframe_rect[2])
+                            h = self._to_float(iframe_rect[3])
+                            method = iframe_rect[4] if len(iframe_rect) > 4 else 'N/A'
 
-                                x = to_float(container_rect[0])
-                                y = to_float(container_rect[1])
-                                w = to_float(container_rect[2])
-                                h = to_float(container_rect[3])
-                                selector = container_rect[4] if len(container_rect) > 4 else 'N/A'
+                            # Turnstile checkbox 在 iframe 内左侧偏移约 30px, 垂直居中
+                            click_x = x + 30
+                            click_y = y + h / 2
 
-                                # 复选框位置：容器左上角偏移约 (40, 40) 像素
-                                click_x = x + 40
-                                click_y = y + 40
+                            logger.info(
+                                f"[{self.account_name}] 发现 Turnstile "
+                                f"({method}, pos: {x:.0f},{y:.0f}, size: {w:.0f}x{h:.0f}), "
+                                f"点击 ({click_x:.0f}, {click_y:.0f})"
+                            )
 
-                                logger.info(
-                                    f"[{self.account_name}] 发现 Turnstile 容器 "
-                                    f"(selector: {selector}, size: {w:.0f}x{h:.0f}), "
-                                    f"尝试点击坐标 ({click_x:.0f}, {click_y:.0f})"
-                                )
-
-                                await tab.mouse_click(click_x, click_y)
-                                turnstile_click_count += 1
-                                logger.info(f"[{self.account_name}] 已点击 Turnstile (第 {turnstile_click_count} 次)")
-                                await asyncio.sleep(4)
-                            except Exception as e:
-                                logger.debug(f"[{self.account_name}] 点击 Turnstile 失败: {e}")
-                        else:
-                            logger.debug(f"[{self.account_name}] 未找到 Turnstile 容器，等待...")
+                            await tab.mouse_click(click_x, click_y)
+                            turnstile_click_count += 1
+                            logger.info(f"[{self.account_name}] 已点击 Turnstile (第 {turnstile_click_count} 次)")
+                            await asyncio.sleep(5)  # 等待验证结果
+                        except Exception as e:
+                            logger.debug(f"[{self.account_name}] 点击 Turnstile 失败: {e}")
+                    else:
+                        logger.debug(f"[{self.account_name}] 未找到 Turnstile iframe/容器，等待...")
 
                     if self._debug:
                         await self._save_debug_screenshot(tab, "cf_waiting")
@@ -353,8 +348,8 @@ class NewAPIBrowserCheckin:
         for attempt in range(max_retries):
             logger.info(f"[{self.account_name}] Cloudflare 验证尝试 {attempt + 1}/{max_retries}...")
 
-            # 第一次尝试用较长超时，后续用较短超时
-            timeout = 30 if attempt == 0 else 20
+            # 第一次尝试给更长超时（含 8 秒初始等待），后续稍短
+            timeout = 60 if attempt == 0 else 40
 
             # 等待 Cloudflare 验证
             cf_passed = await self._wait_for_cloudflare(tab, timeout=timeout)
@@ -380,7 +375,7 @@ class NewAPIBrowserCheckin:
             # 刷新页面重新尝试
             logger.info(f"[{self.account_name}] 刷新页面...")
             await tab.reload()
-            await asyncio.sleep(3)  # 等待页面开始加载
+            await asyncio.sleep(5)  # 等待页面开始加载
 
         return False
 
@@ -1000,7 +995,8 @@ class NewAPIBrowserCheckin:
                             message=message,
                             details=details,
                         )
-                    elif "过期" not in message and "401" not in message:
+                    # 401/403/过期 都应该触发 OAuth 回退
+                    elif "过期" not in message and "401" not in message and "403" not in message:
                         return CheckinResult(
                             platform=f"NewAPI ({self.provider_name})",
                             account=self.account_name,
@@ -1008,7 +1004,7 @@ class NewAPIBrowserCheckin:
                             message=message,
                             details=details,
                         )
-                    logger.warning(f"[{self.account_name}] Cookie 已过期，尝试 OAuth 登录...")
+                    logger.warning(f"[{self.account_name}] Cookie 已过期或被拦截({message})，尝试 OAuth 登录...")
 
             # 2. Cookie 无效，使用浏览器 OAuth 登录
             if not self.linuxdo_username or not self.linuxdo_password:
@@ -1068,6 +1064,9 @@ class NewAPIBrowserCheckin:
             details["login_method"] = "oauth"
             details["new_session"] = session_cookie[:20] + "..."
             details["new_api_user"] = api_user
+            # 存储完整凭据，供 manager 提取并缓存（下次可直接用 Cookie+API）
+            details["_cached_session"] = session_cookie
+            details["_cached_api_user"] = api_user
 
             return CheckinResult(
                 platform=f"NewAPI ({self.provider_name})",
