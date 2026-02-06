@@ -224,6 +224,78 @@ class PlatformManager:
             return cls._is_retryable_network_message(str(err))
         return cls._is_retryable_network_message(str(err))
 
+    @staticmethod
+    def _looks_like_ldoh_site_item(item: dict) -> bool:
+        """判断单个字典是否像 LDOH 站点对象。"""
+        if not isinstance(item, dict):
+            return False
+        keys = {str(k).lower() for k in item.keys()}
+        strong_keys = {"apibaseurl", "supportscheckin", "checkinurl"}
+        if keys & strong_keys:
+            return True
+        has_name = "name" in keys or "title" in keys
+        has_urlish = any(("api" in k and "url" in k) for k in keys) or "domain" in keys
+        return has_name and has_urlish
+
+    @classmethod
+    def _extract_ldoh_sites_from_json(
+        cls, node, path: str = "root", depth: int = 0, max_depth: int = 8
+    ) -> tuple[list, str] | tuple[None, None]:
+        """从任意 JSON 结构中递归提取最可能的站点数组，并返回来源路径。"""
+        if depth > max_depth:
+            return None, None
+
+        if isinstance(node, list):
+            if node:
+                sample = node[: min(5, len(node))]
+                if all(isinstance(item, dict) for item in sample):
+                    hit = sum(1 for item in sample if cls._looks_like_ldoh_site_item(item))
+                    if hit >= max(1, (len(sample) + 1) // 2):
+                        return node, path
+            # 列表里继续向下找，限制扫描数量避免性能退化
+            for idx, item in enumerate(node[:30]):
+                if not isinstance(item, (dict, list)):
+                    continue
+                sites, hit_path = cls._extract_ldoh_sites_from_json(
+                    item, f"{path}[{idx}]", depth + 1, max_depth
+                )
+                if sites is not None:
+                    return sites, hit_path
+            return None, None
+
+        if isinstance(node, dict):
+            priority_words = ("site", "data", "list", "item", "result", "rows")
+            keys = list(node.keys())
+            keys.sort(
+                key=lambda k: any(w in str(k).lower() for w in priority_words),
+                reverse=True,
+            )
+
+            for key in keys:
+                value = node.get(key)
+                next_path = f"{path}.{key}"
+                if isinstance(value, (dict, list)):
+                    sites, hit_path = cls._extract_ldoh_sites_from_json(
+                        value, next_path, depth + 1, max_depth
+                    )
+                    if sites is not None:
+                        return sites, hit_path
+                elif isinstance(value, str):
+                    stripped = value.strip()
+                    if not stripped or len(stripped) > 200_000 or stripped[0] not in "[{":
+                        continue
+                    try:
+                        parsed = json.loads(stripped)
+                    except Exception:
+                        continue
+                    sites, hit_path = cls._extract_ldoh_sites_from_json(
+                        parsed, f"{next_path}(json)", depth + 1, max_depth
+                    )
+                    if sites is not None:
+                        return sites, hit_path
+
+        return None, None
+
     async def _auto_approve_linuxdo_oauth(self, tab) -> bool:
         """在 LinuxDO OAuth 授权页自动点击“允许/Authorize”按钮。"""
         try:
@@ -233,7 +305,7 @@ class PlatformManager:
 
             logger.info(f"LDOH: 检测到 LinuxDO 授权页，尝试自动同意: {current_url}")
 
-            # 多策略点击：文本匹配 -> submit 按钮 -> 主按钮类
+            # 多策略点击：文本匹配 -> 红色主按钮 -> submit/form
             click_result = await tab.evaluate(
                 r"""
                 (function() {
@@ -251,21 +323,50 @@ class PlatformManager:
                     }
 
                     const all = Array.from(document.querySelectorAll('button, a, input[type="submit"], [role="button"]'));
-                    const byText = all.find((el) => {
+                    let target = all.find((el) => {
                         const text = (el.innerText || el.value || el.textContent || '').trim().toLowerCase();
                         return text.includes('允许') || text.includes('同意') || text.includes('authorize') || text.includes('allow');
                     });
-                    if (clickTarget(byText)) return 'text';
 
-                    const submitBtn = document.querySelector('button[type="submit"], input[type="submit"]');
-                    if (clickTarget(submitBtn)) return 'submit';
+                    // LinuxDO 授权页允许按钮通常是红色主按钮
+                    if (!target) {
+                        target = all.find((el) => {
+                            const cls = (el.className || '').toLowerCase();
+                            return cls.includes('btn-danger') || cls.includes('bg-red') || cls.includes('danger');
+                        });
+                    }
 
-                    const primaryBtn = document.querySelector('.btn-primary, .btn.btn-primary');
-                    if (clickTarget(primaryBtn)) return 'primary';
+                    if (!target) {
+                        target = document.querySelector('button[type="submit"], input[type="submit"]');
+                    }
 
-                    const form = document.querySelector('form[action*="oauth"], form[action*="authorize"]');
+                    if (!target) return '';
+
+                    const text = (target.innerText || target.value || target.textContent || '').trim().substring(0, 16);
+
+                    // 如果是链接，直接导航（最可靠）
+                    if (target.tagName === 'A' && target.href && !target.href.startsWith('javascript:')) {
+                        window.location.href = target.href;
+                        return ['navigated', text, target.href.substring(0, 120)];
+                    }
+
+                    if (clickTarget(target)) {
+                        const form = target.closest('form');
+                        if (form) {
+                            try {
+                                form.submit();
+                                return ['form_submitted', text, form.action || ''];
+                            } catch (e) {}
+                        }
+                        return ['clicked', text, ''];
+                    }
+
+                    const form = document.querySelector('form[action*="oauth"], form[action*="authorize"], form[action*="approve"]');
                     if (form) {
-                        try { form.submit(); return 'form_submit'; } catch (e) {}
+                        try {
+                            form.submit();
+                            return ['form_submit_only', '', form.action || ''];
+                        } catch (e) {}
                     }
                     return '';
                 })()
@@ -273,20 +374,83 @@ class PlatformManager:
             )
 
             strategy = self._unwrap_eval_value(click_result)
-            if strategy:
-                logger.info(f"LDOH: 已执行授权点击策略: {strategy}")
+            if strategy and isinstance(strategy, (list, tuple)):
+                action = strategy[0] if len(strategy) > 0 else "unknown"
+                btn_text = strategy[1] if len(strategy) > 1 else ""
+                detail = strategy[2] if len(strategy) > 2 else ""
+                action = self._unwrap_eval_value(action)
+                btn_text = self._unwrap_eval_value(btn_text)
+                detail = self._unwrap_eval_value(detail)
+                logger.info(f"LDOH: 已执行授权点击策略: {action}, 按钮={btn_text}, detail={detail}")
                 await asyncio.sleep(2)
                 new_url = getattr(tab.target, "url", "") or ""
                 if new_url != current_url:
                     logger.success(f"LDOH: 授权页已跳转: {new_url}")
                     return True
                 logger.warning("LDOH: 已点击授权按钮，但页面暂未跳转")
+            elif strategy:
+                logger.info(f"LDOH: 已执行授权点击策略: {strategy}")
+                await asyncio.sleep(2)
             else:
                 logger.warning("LDOH: 授权页未找到可点击的“允许”按钮")
         except Exception as e:
             logger.warning(f"LDOH: 自动同意授权失败: {e}")
 
         return False
+
+    async def _fetch_ldoh_sites_payload_by_navigation(self, tab, ldoh_base_url: str) -> dict | None:
+        """当 fetch('/api/sites') 不稳定时，回退到直接访问 API 页面读取正文。"""
+        try:
+            api_url = f"{ldoh_base_url}/api/sites"
+            await tab.get(api_url)
+            await asyncio.sleep(2)
+            raw_text = await tab.evaluate(
+                r"""
+                (function() {
+                    const pre = document.querySelector('pre');
+                    if (pre) return pre.innerText || pre.textContent || '';
+                    if (document.body) return document.body.innerText || document.body.textContent || '';
+                    return '';
+                })()
+                """
+            )
+            text = self._unwrap_eval_value(raw_text)
+            if not isinstance(text, str):
+                text = str(text or "")
+            text = text.strip()
+            if not text:
+                logger.warning("LDOH: 直接访问 /api/sites 仍为空响应")
+                return None
+
+            payload = json.loads(text)
+            sites, hit_path = self._extract_ldoh_sites_from_json(payload)
+            if sites is None:
+                if isinstance(payload, dict):
+                    keys_preview = ",".join(list(payload.keys())[:8])
+                    logger.warning(
+                        f"LDOH: /api/sites JSON 未识别到站点数组，顶层keys={keys_preview}"
+                    )
+                else:
+                    logger.warning(f"LDOH: /api/sites 返回不支持的 JSON 类型: {type(payload).__name__}")
+                return None
+
+            status = 200
+            if isinstance(payload, dict) and "status" in payload:
+                raw_status = payload.get("status")
+                try:
+                    status = int(raw_status)
+                except (TypeError, ValueError):
+                    status = 200 if sites else -1
+
+            return {
+                "status": status,
+                "total": len(sites),
+                "sites": sites,
+                "_source": f"direct:{hit_path or 'unknown'}",
+            }
+        except Exception as e:
+            logger.warning(f"LDOH: 直接访问 /api/sites 失败: {e}")
+            return None
 
     async def _trigger_ldoh_login_button(self, tab) -> bool:
         """在 LDOH 登录页触发“使用 LinuxDo 登录”按钮。"""
@@ -402,16 +566,29 @@ class PlatformManager:
             payload_text = self._unwrap_eval_value(raw_payload)
             if not isinstance(payload_text, str):
                 payload_text = str(payload_text or "")
+            payload_text = payload_text.strip()
             try:
                 payload = json.loads(payload_text)
             except json.JSONDecodeError:
                 logger.warning(
                     f"LDOH 站点同步返回非 JSON，前200字符: {payload_text[:200]!r}"
                 )
-                return None
+                payload = await self._fetch_ldoh_sites_payload_by_navigation(tab, ldoh_base_url)
+                if payload is None:
+                    return None
 
-            status = int(payload.get("status", -1))
             sites = payload.get("sites") if isinstance(payload.get("sites"), list) else []
+            raw_status = payload.get("status", None)
+            if raw_status is None and sites:
+                status = 200
+            else:
+                try:
+                    status = int(raw_status)
+                except (TypeError, ValueError):
+                    status = -1
+
+            source = payload.get("_source", "fetch")
+            logger.debug(f"LDOH 站点同步解析: source={source}, status={status}, sites={len(sites)}")
             if status != 200 or not sites:
                 logger.warning(f"LDOH 站点同步失败: status={status}, sites={len(sites)}")
                 return None
