@@ -628,6 +628,41 @@ class NewAPIBrowserCheckin:
 
     async def _oauth_login_and_get_session(self, tab) -> tuple[str | None, str | None]:
         """通过 LinuxDO OAuth 登录并获取 session 和 api_user"""
+
+        # 如果 provider 配置了 oauth_path，直接导航（跳过按钮检测，适用于 Wong 等 SPA 站点）
+        oauth_path = getattr(self.provider, 'oauth_path', None)
+        if oauth_path:
+            oauth_url = f"{self.provider.domain}{oauth_path}"
+            logger.info(f"[{self.account_name}] 直接 OAuth 导航: {oauth_url}")
+            await tab.get(oauth_url)
+            await asyncio.sleep(5)
+
+            # 检查是否到了授权页或已自动回来
+            current_url = tab.target.url if hasattr(tab, "target") else ""
+            if "linux.do" in current_url and "authorize" in current_url.lower():
+                logger.info(f"[{self.account_name}] 到达授权页，点击允许...")
+                await tab.evaluate(r"""
+                    (function() {
+                        const links = document.querySelectorAll('a');
+                        for (const a of links) {
+                            if (/允许/.test(a.innerText) && a.href) {
+                                window.location.href = a.href;
+                                return true;
+                            }
+                        }
+                        return false;
+                    })()
+                """)
+                await asyncio.sleep(5)
+
+            # 检查是否回到了 provider 站点
+            current_url = tab.target.url if hasattr(tab, "target") else ""
+            if self.provider.domain.replace("https://", "") in current_url:
+                logger.success(f"[{self.account_name}] 直接 OAuth 成功！")
+                return await self._extract_session_from_browser(tab)
+            else:
+                logger.warning(f"[{self.account_name}] 直接 OAuth 未返回站点，继续尝试按钮方式...")
+
         login_url = f"{self.provider.domain}{self.provider.login_path}"
         logger.info(f"[{self.account_name}] 访问站点登录页: {login_url}")
 
@@ -644,9 +679,9 @@ class NewAPIBrowserCheckin:
             await self._save_debug_screenshot(tab, "already_logged_in")
             return await self._extract_session_from_browser(tab)
 
-        # 等待页面加载并查找 LinuxDO 按钮
+        # 等待 SPA 页面渲染完成（Wong 等站点的按钮需要 JS 框架加载后才出现）
         logger.info(f"[{self.account_name}] 查找 LinuxDO OAuth 登录按钮...")
-        await asyncio.sleep(3)
+        await asyncio.sleep(10)
 
         # Debug 模式：打印页面上所有可点击元素帮助调试
         if self._debug:
@@ -750,80 +785,75 @@ class NewAPIBrowserCheckin:
         except Exception as e:
             logger.debug(f"[{self.account_name}] 检查用户协议复选框失败: {e}")
 
-        # 点击 LinuxDO OAuth 按钮（使用多种匹配策略）
+        # 点击 LinuxDO OAuth 按钮（返回位置 + mouse_click 物理点击，Semi Design 等组件的 JS .click() 不可靠）
+        # 多次重试：SPA 站点（如 Wong）的按钮需要等待 JS 框架渲染完成
         clicked = False
-        for attempt in range(5):
+        for attempt in range(10):
             try:
-                # 策略1: 查找包含 linuxdo 的链接（最可靠）
-                # 使用原始字符串避免 Python 转义序列警告
-                clicked_result = await tab.evaluate(r"""
+                # 返回按钮位置 [x, y, w, h, description]，用于 mouse_click
+                btn_rect = await tab.evaluate(r"""
                     (function() {
+                        function getRect(el, desc) {
+                            const rect = el.getBoundingClientRect();
+                            if (rect.width > 0 && rect.height > 0) {
+                                return [rect.x, rect.y, rect.width, rect.height, desc];
+                            }
+                            return null;
+                        }
+
                         // 策略1: 查找 href 包含 linuxdo 或 oauth 的链接
                         const links = document.querySelectorAll('a[href*="linuxdo"], a[href*="oauth/linuxdo"]');
                         for (const link of links) {
-                            link.click();
-                            return 'clicked link: ' + (link.href || '').substring(0, 60);
+                            const r = getRect(link, 'link: ' + (link.href||'').substring(0,50));
+                            if (r) return r;
                         }
 
-                        // 策略2: 查找文本包含 LINUX DO 的按钮/链接（不区分大小写，支持多种写法）
+                        // 策略2: 文本匹配 LINUX DO
                         const allClickable = document.querySelectorAll('button, a, [role="button"], div[onclick], span[onclick]');
                         const patterns = [
-                            /linux\s*do/i,           // LINUX DO, LinuxDO, linux do
-                            /通过.*linux/i,          // 通过 LINUX DO 登录
-                            /使用.*linux/i,          // 使用 LINUX DO 登录
-                            /continue.*linux/i,      // Continue with LinuxDO
-                            /login.*linux/i,         // Login with LinuxDO
-                            /第三方.*登录/i,          // 第三方登录（可能是展开按钮）
-                            /其他.*登录/i,           // 其他登录方式
-                            /更多.*方式/i            // 更多登录方式
+                            /linux\s*do/i, /通过.*linux/i, /使用.*linux/i,
+                            /continue.*linux/i, /login.*linux/i,
+                            /第三方.*登录/i, /其他.*登录/i, /更多.*方式/i
                         ];
-
                         for (const el of allClickable) {
                             const text = (el.innerText || el.textContent || '').trim();
                             for (const pattern of patterns) {
                                 if (pattern.test(text)) {
-                                    el.click();
-                                    return 'clicked text: ' + text.substring(0, 40);
+                                    const r = getRect(el, 'text: ' + text.substring(0,30));
+                                    if (r) return r;
                                 }
                             }
                         }
 
-                        // 策略3: 查找包含 linuxdo 图标的元素
-                        const icons = document.querySelectorAll('img[src*="linuxdo"], svg[class*="linuxdo"], i[class*="linuxdo"]');
+                        // 策略3: linuxdo 图标
+                        const icons = document.querySelectorAll('img[src*="linuxdo"], svg[class*="linuxdo"]');
                         for (const icon of icons) {
                             const parent = icon.closest('button, a, [role="button"]') || icon.parentElement;
                             if (parent) {
-                                parent.click();
-                                return 'clicked icon parent';
+                                const r = getRect(parent, 'icon-parent');
+                                if (r) return r;
                             }
                         }
 
-                        // 策略4: Wong 等站点 — 按钮内有图标但文字不含 "LinuxDO"
-                        // 查找包含"使用"+"继续"文字的按钮（图标按钮的 innerText 可能是 "使用 继续"）
+                        // 策略4: "使用...继续" 图标按钮（Wong 等）
                         for (const el of allClickable) {
-                            const text = (el.innerText || el.textContent || '').replace(/\s+/g, '').trim();
+                            const text = (el.innerText || '').replace(/\s+/g, '').trim();
                             if (/使用.*继续/.test(text) || /continue/i.test(text)) {
-                                // 验证这个按钮内确实有图标（避免误触其他"继续"按钮）
                                 if (el.querySelector('img, svg') || el.className.includes('tertiary')) {
-                                    el.click();
-                                    return 'clicked icon-button: ' + (el.innerText || '').trim().substring(0, 30);
+                                    const r = getRect(el, 'icon-btn: ' + (el.innerText||'').trim().substring(0,20));
+                                    if (r) return r;
                                 }
                             }
                         }
 
-                        // 策略5: 查找所有按钮内的图片，检查 alt/title 属性
+                        // 策略5: 按钮内图片 alt/src 含 linux
                         const allBtns = document.querySelectorAll('button, a, [role="button"]');
                         for (const btn of allBtns) {
-                            const imgs = btn.querySelectorAll('img');
-                            for (const img of imgs) {
-                                const alt = (img.alt || '').toLowerCase();
-                                const title = (img.title || '').toLowerCase();
-                                const src = (img.src || '').toLowerCase();
-                                if (alt.includes('linux') || title.includes('linux') ||
-                                    src.includes('linux') || src.includes('oauth') ||
-                                    src.includes('connect')) {
-                                    btn.click();
-                                    return 'clicked img-btn: alt=' + alt + ' src=' + src.substring(0, 40);
+                            for (const img of btn.querySelectorAll('img')) {
+                                const s = ((img.alt||'') + (img.src||'')).toLowerCase();
+                                if (s.includes('linux') || s.includes('oauth') || s.includes('connect')) {
+                                    const r = getRect(btn, 'img-btn: ' + (img.src||'').substring(0,30));
+                                    if (r) return r;
                                 }
                             }
                         }
@@ -832,8 +862,21 @@ class NewAPIBrowserCheckin:
                     })()
                 """)
 
-                if clicked_result:
-                    logger.info(f"[{self.account_name}] {clicked_result}")
+                if btn_rect and isinstance(btn_rect, (list, tuple)) and len(btn_rect) >= 4:
+                    x = self._to_float(btn_rect[0])
+                    y = self._to_float(btn_rect[1])
+                    w = self._to_float(btn_rect[2])
+                    h = self._to_float(btn_rect[3])
+                    desc = btn_rect[4] if len(btn_rect) > 4 else '?'
+                    if isinstance(desc, dict):
+                        desc = desc.get('value', desc)
+                    click_x = x + w / 2
+                    click_y = y + h / 2
+                    logger.info(
+                        f"[{self.account_name}] 找到 OAuth 按钮: {desc}, "
+                        f"物理点击 ({click_x:.0f}, {click_y:.0f})"
+                    )
+                    await tab.mouse_click(click_x, click_y)
                     await self._save_debug_screenshot(tab, "oauth_button_clicked")
                     clicked = True
                     break
@@ -844,57 +887,8 @@ class NewAPIBrowserCheckin:
             await asyncio.sleep(1)
 
         if not clicked:
-            # 登录页没找到 OAuth 按钮，尝试注册页（Wong 等站点的 LinuxDO 入口在注册页）
-            register_url = f"{self.provider.domain}/register"
-            logger.info(f"[{self.account_name}] 登录页未找到 OAuth 按钮，尝试注册页: {register_url}")
-            await tab.get(register_url)
-            await asyncio.sleep(3)
-            await self._save_debug_screenshot(tab, "register_page")
-
-            # 在注册页重新查找 OAuth 按钮（同样的检测逻辑）
-            for attempt in range(3):
-                try:
-                    clicked_result = await tab.evaluate(r"""
-                        (function() {
-                            const links = document.querySelectorAll('a[href*="linuxdo"], a[href*="oauth/linuxdo"]');
-                            for (const link of links) {
-                                link.click();
-                                return 'clicked link: ' + (link.href || '').substring(0, 60);
-                            }
-                            const allClickable = document.querySelectorAll('button, a, [role="button"], div[onclick], span[onclick]');
-                            const patterns = [
-                                /linux\s*do/i, /使用.*linux/i, /通过.*linux/i,
-                                /continue.*linux/i, /login.*linux/i
-                            ];
-                            for (const el of allClickable) {
-                                const text = (el.innerText || el.textContent || '').trim();
-                                for (const pattern of patterns) {
-                                    if (pattern.test(text)) {
-                                        el.click();
-                                        return 'clicked text: ' + text.substring(0, 40);
-                                    }
-                                }
-                            }
-                            const icons = document.querySelectorAll('img[src*="linuxdo"], svg[class*="linuxdo"]');
-                            for (const icon of icons) {
-                                const parent = icon.closest('button, a, [role="button"]') || icon.parentElement;
-                                if (parent) { parent.click(); return 'clicked icon parent'; }
-                            }
-                            return null;
-                        })()
-                    """)
-                    if clicked_result:
-                        logger.info(f"[{self.account_name}] 注册页找到 OAuth: {clicked_result}")
-                        await self._save_debug_screenshot(tab, "register_oauth_clicked")
-                        clicked = True
-                        break
-                except Exception as e:
-                    logger.debug(f"[{self.account_name}] 注册页查找 OAuth 按钮出错: {e}")
-                await asyncio.sleep(1)
-
-            if not clicked:
-                logger.warning(f"[{self.account_name}] 登录页和注册页均未找到 LinuxDO OAuth 按钮")
-                await self._save_debug_screenshot(tab, "oauth_button_not_found")
+            logger.warning(f"[{self.account_name}] 未找到 LinuxDO OAuth 按钮")
+            await self._save_debug_screenshot(tab, "oauth_button_not_found")
 
         # 等待 OAuth 授权
         logger.info(f"[{self.account_name}] 等待 OAuth 授权...")

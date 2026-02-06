@@ -360,6 +360,7 @@ class ProviderConfig:
     api_user_key: str = "new-api-user"
     bypass_method: Literal["waf_cookies"] | None = None
     waf_cookie_names: list[str] | None = None
+    oauth_path: str | None = None  # 直接 OAuth 跳转路径（跳过按钮检测）
 
     def __post_init__(self):
         required_waf_cookies = set()
@@ -384,6 +385,7 @@ class ProviderConfig:
             api_user_key=data.get("api_user_key", "new-api-user"),
             bypass_method=data.get("bypass_method"),
             waf_cookie_names=data.get("waf_cookie_names"),
+            oauth_path=data.get("oauth_path"),
         )
 
     def to_dict(self) -> dict:

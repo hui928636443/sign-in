@@ -224,65 +224,218 @@ class PlatformManager:
                 "account_name": account_name,
             })
 
-        # 3. 批量处理需要 OAuth 的站点（每个站点最多 3 分钟）
-        SITE_TIMEOUT = 180  # 单站点超时：3 分钟
+        # 3. 共享浏览器会话：登录 LinuxDO 一次，所有站点复用（大幅提速+提高成功率）
+        SITE_TIMEOUT = 120  # 单站点超时：2 分钟（共享会话不需要重复登录，更快）
         if need_oauth:
-            logger.info(f"需要浏览器OAuth登录: {len(need_oauth)} 个站点（每站限时 {SITE_TIMEOUT}s）")
+            logger.info(f"需要浏览器OAuth登录: {len(need_oauth)} 个站点（共享会话，每站限时 {SITE_TIMEOUT}s）")
 
-            for idx, item in enumerate(need_oauth):
-                provider = item["provider"]
-                provider_name = item["provider_name"]
-                account_name = item["account_name"]
+            import os
+            from platforms.newapi_browser import NewAPIBrowserCheckin
+            from utils.browser import BrowserManager, get_browser_engine
 
-                logger.info(f"[{idx+1}/{len(need_oauth)}] [{account_name}] 尝试浏览器 OAuth 登录...")
+            # 启动一个共享浏览器实例
+            is_ci = bool(os.environ.get("CI")) or bool(os.environ.get("GITHUB_ACTIONS"))
+            headless = os.environ.get("BROWSER_HEADLESS", "false").lower() == "true"
+            if is_ci and bool(os.environ.get("DISPLAY")):
+                headless = False
 
-                try:
-                    result = await asyncio.wait_for(
-                        browser_checkin_newapi(
-                            provider_name=provider_name,
-                            linuxdo_username=linuxdo_username,
-                            linuxdo_password=linuxdo_password,
-                            cookies=None,
-                            api_user=None,
-                            account_name=account_name,
-                        ),
-                        timeout=SITE_TIMEOUT,
+            engine = get_browser_engine()
+            browser_mgr = BrowserManager(engine=engine, headless=headless)
+
+            try:
+                await browser_mgr.start(max_retries=5 if is_ci else 3)
+                tab = browser_mgr.page
+
+                # 登录 LinuxDO 一次（所有站点复用这个会话）
+                # 共享登录不保存 debug 截图（截图在 CF 页面会挂起 30-60 秒，拖慢时序）
+                logger.info("共享会话: 登录 LinuxDO...")
+                checker_for_login = NewAPIBrowserCheckin(
+                    provider_name=need_oauth[0]["provider_name"],
+                    linuxdo_username=linuxdo_username,
+                    linuxdo_password=linuxdo_password,
+                    account_name="shared_login",
+                )
+                checker_for_login._browser_manager = browser_mgr
+                checker_for_login._debug = False  # 共享登录禁用截图，避免拖慢
+
+                # 最多重试 3 次登录 LinuxDO（每次重新打开登录页）
+                linuxdo_logged_in = False
+                for login_attempt in range(3):
+                    if login_attempt > 0:
+                        logger.info(f"共享会话: LinuxDO 登录重试 {login_attempt + 1}/3...")
+                        await tab.get("about:blank")
+                        await asyncio.sleep(1)
+                    linuxdo_logged_in = await checker_for_login._login_linuxdo(tab)
+                    if linuxdo_logged_in:
+                        break
+                    logger.warning(f"共享会话: LinuxDO 登录失败（第 {login_attempt + 1} 次）")
+
+                if not linuxdo_logged_in:
+                    logger.error("共享会话: LinuxDO 3 次登录全部失败，回退到逐站独立浏览器模式")
+                    await browser_mgr.close()
+                    await self._run_newapi_oauth_fallback(
+                        need_oauth, linuxdo_username, linuxdo_password, results
                     )
+                    return results
 
-                    if result.status == CheckinStatus.SUCCESS:
-                        logger.success(f"[{account_name}] OAuth 签到成功！")
-                        # 缓存新 Cookie
-                        if result.details:
-                            cached_session = result.details.pop("_cached_session", None)
-                            cached_api_user = result.details.pop("_cached_api_user", None)
-                            if cached_session and cached_api_user:
-                                self._cookie_cache.save(
-                                    provider_name, account_name, cached_session, cached_api_user
-                                )
-                                logger.success(f"[{account_name}] 新Cookie已缓存")
-                    else:
-                        logger.warning(f"[{account_name}] OAuth 签到失败: {result.message}")
+                logger.success("共享会话: LinuxDO 登录成功！开始遍历所有站点...")
 
-                    results.append(result)
+                # 遍历所有站点，复用同一个浏览器和 LinuxDO 会话
+                for idx, item in enumerate(need_oauth):
+                    provider = item["provider"]
+                    provider_name = item["provider_name"]
+                    account_name = item["account_name"]
 
-                except asyncio.TimeoutError:
-                    logger.error(f"[{account_name}] 超时（>{SITE_TIMEOUT}s），跳过")
-                    results.append(CheckinResult(
-                        platform=f"NewAPI ({provider_name})",
-                        account=account_name,
-                        status=CheckinStatus.FAILED,
-                        message=f"OAuth 超时（>{SITE_TIMEOUT}s）",
-                    ))
-                except Exception as e:
-                    logger.error(f"[{account_name}] OAuth 签到异常: {e}")
-                    results.append(CheckinResult(
-                        platform=f"NewAPI ({provider_name})",
-                        account=account_name,
-                        status=CheckinStatus.FAILED,
-                        message=f"OAuth 异常: {str(e)}",
-                    ))
+                    logger.info(f"[{idx+1}/{len(need_oauth)}] [{account_name}] OAuth 登录...")
+
+                    try:
+                        result = await asyncio.wait_for(
+                            self._oauth_single_site_shared(
+                                tab, browser_mgr, provider, provider_name,
+                                account_name, linuxdo_username, linuxdo_password,
+                            ),
+                            timeout=SITE_TIMEOUT,
+                        )
+
+                        if result.status == CheckinStatus.SUCCESS:
+                            logger.success(f"[{account_name}] OAuth 签到成功！")
+                            if result.details:
+                                cached_session = result.details.pop("_cached_session", None)
+                                cached_api_user = result.details.pop("_cached_api_user", None)
+                                if cached_session and cached_api_user:
+                                    self._cookie_cache.save(
+                                        provider_name, account_name, cached_session, cached_api_user
+                                    )
+                                    logger.success(f"[{account_name}] 新Cookie已缓存")
+                        else:
+                            logger.warning(f"[{account_name}] OAuth 签到失败: {result.message}")
+
+                        results.append(result)
+
+                    except asyncio.TimeoutError:
+                        logger.error(f"[{account_name}] 超时（>{SITE_TIMEOUT}s），跳过")
+                        results.append(CheckinResult(
+                            platform=f"NewAPI ({provider_name})",
+                            account=account_name,
+                            status=CheckinStatus.FAILED,
+                            message=f"OAuth 超时（>{SITE_TIMEOUT}s）",
+                        ))
+                    except Exception as e:
+                        logger.error(f"[{account_name}] OAuth 异常: {e}")
+                        results.append(CheckinResult(
+                            platform=f"NewAPI ({provider_name})",
+                            account=account_name,
+                            status=CheckinStatus.FAILED,
+                            message=f"OAuth 异常: {str(e)}",
+                        ))
+
+            except Exception as e:
+                logger.error(f"共享浏览器启动失败: {e}")
+            finally:
+                logger.info("共享会话: 关闭浏览器")
+                await browser_mgr.close()
 
         return results
+
+    async def _oauth_single_site_shared(
+        self, tab, browser_mgr, provider, provider_name: str,
+        account_name: str, linuxdo_username: str, linuxdo_password: str,
+    ) -> CheckinResult:
+        """在共享浏览器会话中对单个站点执行 OAuth 登录+签到"""
+        import httpx
+        from platforms.newapi_browser import NewAPIBrowserCheckin
+
+        # 创建 checker 实例（复用已有的浏览器，不重新登录 LinuxDO）
+        checker = NewAPIBrowserCheckin(
+            provider_name=provider_name,
+            linuxdo_username=linuxdo_username,
+            linuxdo_password=linuxdo_password,
+            account_name=account_name,
+        )
+        checker._browser_manager = browser_mgr
+
+        try:
+            # 直接在共享 tab 上做 OAuth（跳过 LinuxDO 登录，已经登录了）
+            session_cookie, api_user = await checker._oauth_login_and_get_session(tab)
+
+            if not session_cookie or not api_user:
+                return CheckinResult(
+                    platform=f"NewAPI ({provider_name})",
+                    account=account_name,
+                    status=CheckinStatus.FAILED,
+                    message="OAuth 登录失败，无法获取 session",
+                )
+
+            # 用获取到的 session 签到
+            logger.info(f"[{account_name}] 使用新 session 签到...")
+            success, message, details = await checker._checkin_with_cookies(session_cookie, api_user)
+
+            details["login_method"] = "shared_oauth"
+            details["_cached_session"] = session_cookie
+            details["_cached_api_user"] = api_user
+
+            return CheckinResult(
+                platform=f"NewAPI ({provider_name})",
+                account=account_name,
+                status=CheckinStatus.SUCCESS if success else CheckinStatus.FAILED,
+                message=message,
+                details=details,
+            )
+        except Exception as e:
+            logger.error(f"[{account_name}] 共享OAuth异常: {e}")
+            return CheckinResult(
+                platform=f"NewAPI ({provider_name})",
+                account=account_name,
+                status=CheckinStatus.FAILED,
+                message=f"OAuth 异常: {str(e)}",
+            )
+
+    async def _run_newapi_oauth_fallback(
+        self, need_oauth: list[dict], linuxdo_username: str, linuxdo_password: str,
+        results: list[CheckinResult],
+    ) -> None:
+        """回退模式：共享会话失败时，逐站独立启动浏览器"""
+        from platforms.newapi_browser import browser_checkin_newapi
+
+        SITE_TIMEOUT = 180
+        logger.warning(f"回退模式：逐站独立浏览器，{len(need_oauth)} 个站点")
+
+        for idx, item in enumerate(need_oauth):
+            provider_name = item["provider_name"]
+            account_name = item["account_name"]
+
+            logger.info(f"[{idx+1}/{len(need_oauth)}] [{account_name}] 独立浏览器 OAuth...")
+
+            try:
+                result = await asyncio.wait_for(
+                    browser_checkin_newapi(
+                        provider_name=provider_name,
+                        linuxdo_username=linuxdo_username,
+                        linuxdo_password=linuxdo_password,
+                        cookies=None, api_user=None,
+                        account_name=account_name,
+                    ),
+                    timeout=SITE_TIMEOUT,
+                )
+
+                if result.status == CheckinStatus.SUCCESS and result.details:
+                    cached_session = result.details.pop("_cached_session", None)
+                    cached_api_user = result.details.pop("_cached_api_user", None)
+                    if cached_session and cached_api_user:
+                        self._cookie_cache.save(provider_name, account_name, cached_session, cached_api_user)
+
+                results.append(result)
+
+            except asyncio.TimeoutError:
+                results.append(CheckinResult(
+                    platform=f"NewAPI ({provider_name})", account=account_name,
+                    status=CheckinStatus.FAILED, message=f"OAuth 超时（>{SITE_TIMEOUT}s）",
+                ))
+            except Exception as e:
+                results.append(CheckinResult(
+                    platform=f"NewAPI ({provider_name})", account=account_name,
+                    status=CheckinStatus.FAILED, message=f"OAuth 异常: {str(e)}",
+                ))
 
     async def _run_newapi_with_accounts(self) -> list[CheckinResult]:
         """手动模式：使用 NEWAPI_ACCOUNTS 中预配置的账号签到"""
