@@ -12,6 +12,7 @@ const failedMetaEl = document.getElementById("failedMeta");
 const failedPreviewEl = document.getElementById("failedPreview");
 const importFailedBtn = document.getElementById("importFailedBtn");
 const failedFileInputEl = document.getElementById("failedFileInput");
+const openMergeToolBtn = document.getElementById("openMergeToolBtn");
 const baseAccountsEl = document.getElementById("baseAccounts");
 const resultJsonEl = document.getElementById("resultJson");
 const extractSummaryEl = document.getElementById("extractSummary");
@@ -85,6 +86,30 @@ function parseDomainFromUrl(rawUrl) {
   } catch {
     return "";
   }
+}
+
+function normalizeAccountRecord(input) {
+  if (!input || typeof input !== "object") return null;
+  const provider = normalizeProvider(input.provider || "");
+  const apiUser = String(input.api_user || "").trim();
+  if (!provider || !apiUser) return null;
+
+  const name = String(input.name || `${provider}_${apiUser}`).trim() || `${provider}_${apiUser}`;
+  const session = String(input.cookies?.session || "").trim();
+  return {
+    name,
+    provider,
+    cookies: { session },
+    api_user: apiUser,
+  };
+}
+
+function parseAccountsJsonArray(raw, sourceLabel = "账号配置") {
+  const parsed = safeJsonParse(raw, null);
+  if (!Array.isArray(parsed)) {
+    throw new Error(`${sourceLabel} 不是 JSON 数组`);
+  }
+  return parsed.map(normalizeAccountRecord).filter(Boolean);
 }
 
 function dedupeByKey(items, keyFn) {
@@ -255,26 +280,42 @@ async function getApiUserFromOpenTab(domain) {
 function parseBaseAccounts() {
   const raw = baseAccountsEl.value.trim();
   if (!raw) return [];
-  const parsed = safeJsonParse(raw, null);
-  if (!Array.isArray(parsed)) {
-    throw new Error("当前 NEWAPI_ACCOUNTS 不是 JSON 数组");
-  }
+  return parseAccountsJsonArray(raw, "当前 NEWAPI_ACCOUNTS");
+}
 
-  return parsed
-    .filter((x) => x && x.provider && x.api_user)
-    .map((x) => ({
-      name: x.name || `${x.provider}_${x.api_user}`,
-      provider: normalizeProvider(x.provider),
-      cookies: { session: String(x.cookies?.session || "") },
-      api_user: String(x.api_user),
-    }));
+function mergeAccountPair(existing, incoming) {
+  const incomingSession = String(incoming?.cookies?.session || "").trim();
+  const existingSession = String(existing?.cookies?.session || "").trim();
+  return {
+    name: String(incoming?.name || existing?.name || "").trim(),
+    provider: normalizeProvider(incoming?.provider || existing?.provider),
+    cookies: { session: incomingSession || existingSession },
+    api_user: String(incoming?.api_user || existing?.api_user || "").trim(),
+  };
 }
 
 function mergeAccounts(baseAccounts, newAccounts) {
   const map = new Map();
-  baseAccounts.forEach((x) => map.set(`${x.provider}_${x.api_user}`, x));
-  newAccounts.forEach((x) => map.set(`${x.provider}_${x.api_user}`, x));
-  return Array.from(map.values()).sort((a, b) => a.provider.localeCompare(b.provider));
+  const upsert = (item) => {
+    const normalized = normalizeAccountRecord(item);
+    if (!normalized) return;
+    const key = `${normalized.provider}_${normalized.api_user}`;
+    const existing = map.get(key);
+    if (!existing) {
+      map.set(key, normalized);
+      return;
+    }
+    map.set(key, mergeAccountPair(existing, normalized));
+  };
+
+  baseAccounts.forEach(upsert);
+  newAccounts.forEach(upsert);
+
+  return Array.from(map.values()).sort((a, b) => {
+    const byProvider = a.provider.localeCompare(b.provider);
+    if (byProvider !== 0) return byProvider;
+    return String(a.api_user).localeCompare(String(b.api_user));
+  });
 }
 
 async function extractFailedCookiesAndBuildSecret() {
@@ -393,6 +434,12 @@ failedFileInputEl.addEventListener("change", async () => {
     importFailedBtn.disabled = false;
     failedFileInputEl.value = "";
   }
+});
+
+openMergeToolBtn.addEventListener("click", async () => {
+  const url = chrome.runtime.getURL("merge.html");
+  await chrome.tabs.create({ url, active: true });
+  setStatus("已打开独立 JSON 合并去重工具（新标签页）。");
 });
 
 openFailedBtn.addEventListener("click", async () => {

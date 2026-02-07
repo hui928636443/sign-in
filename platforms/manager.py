@@ -1307,7 +1307,33 @@ class PlatformManager:
             logger.warning("未配置 LINUXDO_ACCOUNTS，自动模式无法执行")
             return []
         logger.info("使用仅自动模式：以 LINUXDO_ACCOUNTS 遍历站点，NEWAPI_ACCOUNTS 仅作为 seed cookie")
-        return await self._run_newapi_auto_oauth()
+
+        all_results: list[CheckinResult] = []
+        total_accounts = len(self._linuxdo_accounts)
+
+        for idx, linuxdo_account in enumerate(self._linuxdo_accounts):
+            linuxdo_username = linuxdo_account.get("username", "")
+            linuxdo_name = linuxdo_account.get("name", linuxdo_username or f"LinuxDO账号{idx + 1}")
+            logger.info(
+                f"自动模式: 开始处理 LinuxDO 账号 [{idx + 1}/{total_accounts}] [{linuxdo_name}]"
+            )
+            try:
+                account_results = await self._run_newapi_auto_oauth(
+                    linuxdo_account=linuxdo_account,
+                    account_index=idx,
+                    account_total=total_accounts,
+                )
+                all_results.extend(account_results)
+            except Exception as e:
+                logger.exception(f"[{linuxdo_name}] 自动模式运行异常: {e}")
+                all_results.append(CheckinResult(
+                    platform="NewAPI",
+                    account=linuxdo_name,
+                    status=CheckinStatus.FAILED,
+                    message=f"自动模式运行异常: {str(e)}",
+                ))
+
+        return all_results
 
     def _build_seed_accounts_by_provider(self) -> dict[str, AnyRouterAccount]:
         """构建 NEWAPI_ACCOUNTS seed 映射（provider -> AnyRouterAccount）。"""
@@ -1325,8 +1351,13 @@ class PlatformManager:
             logger.debug(f"[seed] provider={provider}, account={account.get_display_name(idx)}")
         return seeds
 
-    async def _run_newapi_auto_oauth(self) -> list[CheckinResult]:
-        """自动模式：用 LinuxDO 账号遍历所有 NewAPI 站点，自动 OAuth 登录签到
+    async def _run_newapi_auto_oauth(
+        self,
+        linuxdo_account: dict | None = None,
+        account_index: int = 0,
+        account_total: int = 1,
+    ) -> list[CheckinResult]:
+        """自动模式：用单个 LinuxDO 账号遍历所有 NewAPI 站点，自动 OAuth 登录签到
 
         用户只需配置 LINUXDO_ACCOUNTS，系统自动：
         1. 优先从 LDOH 同步“可签到站点”
@@ -1353,13 +1384,19 @@ class PlatformManager:
             "oauth_network_failed": 0,
         }
 
-        # 使用第一个 LinuxDO 账号
-        linuxdo_account = self._linuxdo_accounts[0]
+        if linuxdo_account is None:
+            linuxdo_account = self._linuxdo_accounts[0]
+
         linuxdo_username = linuxdo_account["username"]
         linuxdo_password = linuxdo_account["password"]
         linuxdo_name = linuxdo_account.get("name", linuxdo_username)
+        account_progress = (
+            f"{account_index + 1}/{account_total}"
+            if account_total > 0
+            else "1/1"
+        )
 
-        logger.info(f"自动模式: 使用 LinuxDO 账号 [{linuxdo_name}] 遍历站点")
+        logger.info(f"自动模式[{account_progress}]: 使用 LinuxDO 账号 [{linuxdo_name}] 遍历站点")
         seed_accounts = self._build_seed_accounts_by_provider()
         if seed_accounts:
             logger.info(f"自动模式: 加载 NEWAPI_ACCOUNTS seed cookie {len(seed_accounts)} 个 provider")
