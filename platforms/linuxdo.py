@@ -313,8 +313,8 @@ class LinuxDOAdapter(BasePlatformAdapter):
             logger.error(f"[{self.account_name}] 浏览器登录最终失败: {last_error}")
         return False
 
-    async def _wait_for_cloudflare_nodriver(self, tab, timeout: int = 60) -> bool:
-        """等待 Cloudflare 挑战完成（nodriver 专用，支持 Turnstile 点击）
+    async def _wait_for_cloudflare_nodriver(self, tab, timeout: int = 30) -> bool:
+        """等待 Cloudflare 挑战完成（nodriver 专用）
 
         Args:
             tab: nodriver 标签页
@@ -326,20 +326,11 @@ class LinuxDOAdapter(BasePlatformAdapter):
         logger.info(f"[{self.account_name}] 检测 Cloudflare 挑战...")
 
         start_time = asyncio.get_event_loop().time()
-        turnstile_click_count = 0
-        max_turnstile_clicks = 5
-        initial_wait_done = False
 
         while asyncio.get_event_loop().time() - start_time < timeout:
             try:
                 # 获取页面标题
                 title = await tab.evaluate("document.title")
-                current_url = ""
-                with contextlib.suppress(Exception):
-                    current_url = getattr(tab.target, "url", "") or ""
-                if not current_url:
-                    with contextlib.suppress(Exception):
-                        current_url = await tab.evaluate("location.href || ''")
 
                 # Cloudflare 挑战页面的特征
                 cf_indicators = [
@@ -348,108 +339,19 @@ class LinuxDOAdapter(BasePlatformAdapter):
                     "please wait",
                     "verifying",
                     "something went wrong",
-                    "请稍候",
                 ]
 
                 title_lower = title.lower() if title else ""
-                url_lower = current_url.lower() if current_url else ""
-
-                # 检测 Turnstile iframe 是否存在
-                has_cf_element = await tab.evaluate(r"""
-                    (function() {
-                        const iframes = document.querySelectorAll('iframe');
-                        for (const iframe of iframes) {
-                            if ((iframe.src || '').includes('challenges.cloudflare.com')) {
-                                const rect = iframe.getBoundingClientRect();
-                                if (rect.width > 10 && rect.height > 10) return true;
-                            }
-                        }
-                        if (document.querySelector('.cf-turnstile, div[data-sitekey]')) return true;
-                        const bodyText = document.body?.innerText || '';
-                        return ['确认您是真人', '验证您是真人', 'verify you are human']
-                            .some(t => bodyText.toLowerCase().includes(t.toLowerCase()));
-                    })()
-                """)
 
                 # 检查是否还在 Cloudflare 挑战中
-                in_cf_challenge_url = "/cdn-cgi/challenge-platform" in url_lower
-                is_cf_page = any(ind in title_lower for ind in cf_indicators) or has_cf_element or in_cf_challenge_url
+                is_cf_page = any(ind in title_lower for ind in cf_indicators)
 
-                # 优先基于 URL 判定通过，避免 title 短暂空值导致误判
-                if (
-                    not is_cf_page
-                    and "linux.do" in url_lower
-                    and "/cdn-cgi/challenge-platform" not in url_lower
-                ):
-                    logger.success(
-                        f"[{self.account_name}] Cloudflare 挑战通过！URL: {current_url or 'N/A'} "
-                        f"标题: {title or 'N/A'}"
-                    )
+                if not is_cf_page and title and "linux" in title_lower:
+                    logger.success(f"[{self.account_name}] Cloudflare 挑战通过！页面标题: {title}")
                     return True
 
-                # 前 8 秒只等待，不点击
-                elapsed = asyncio.get_event_loop().time() - start_time
-                if not initial_wait_done and elapsed < 8:
-                    logger.debug(f"[{self.account_name}] 等待非交互式挑战... ({elapsed:.0f}s)")
-                    await asyncio.sleep(2)
-                    continue
-                initial_wait_done = True
-
-                if is_cf_page and turnstile_click_count < max_turnstile_clicks:
-                    # 通过 iframe 精确定位 Turnstile
-                    iframe_rect = await tab.evaluate(r"""
-                        (function() {
-                            const iframes = document.querySelectorAll('iframe');
-                            for (const iframe of iframes) {
-                                if ((iframe.src || '').includes('challenges.cloudflare.com')) {
-                                    const rect = iframe.getBoundingClientRect();
-                                    if (rect.width > 0 && rect.height > 0) {
-                                        return [rect.x, rect.y, rect.width, rect.height, 'cf-iframe'];
-                                    }
-                                }
-                            }
-                            const c = document.querySelector('.cf-turnstile') ||
-                                      document.querySelector('div[data-sitekey]');
-                            if (c) {
-                                const rect = c.getBoundingClientRect();
-                                if (rect.width > 0 && rect.height > 0) {
-                                    return [rect.x, rect.y, rect.width, rect.height, 'cf-container'];
-                                }
-                            }
-                            return null;
-                        })()
-                    """)
-
-                    if iframe_rect and isinstance(iframe_rect, (list, tuple)) and len(iframe_rect) >= 4:
-                        try:
-                            def _to_float(val):
-                                if isinstance(val, (int, float)):
-                                    return float(val)
-                                if isinstance(val, dict):
-                                    return float(val.get('value', 0))
-                                return float(val)
-
-                            x = _to_float(iframe_rect[0])
-                            y = _to_float(iframe_rect[1])
-                            w = _to_float(iframe_rect[2])
-                            h = _to_float(iframe_rect[3])
-                            method = iframe_rect[4] if len(iframe_rect) > 4 else 'N/A'
-
-                            offset_x = max(20.0, min(40.0, w * 0.2))
-                            click_x = x + offset_x + random.uniform(-2.0, 2.0)
-                            click_y = y + h / 2 + random.uniform(-1.5, 1.5)
-
-                            logger.info(
-                                f"[{self.account_name}] 发现 Turnstile ({method}), "
-                                f"点击 ({click_x:.0f}, {click_y:.0f})"
-                            )
-                            await tab.mouse_click(click_x, click_y)
-                            turnstile_click_count += 1
-                            await asyncio.sleep(5)
-                        except Exception as e:
-                            logger.debug(f"[{self.account_name}] 点击 Turnstile 失败: {e}")
-                    else:
-                        logger.debug(f"[{self.account_name}] 等待 Cloudflare... 标题: {title}")
+                if is_cf_page:
+                    logger.debug(f"[{self.account_name}] 等待 Cloudflare... 当前标题: {title}")
 
             except Exception as e:
                 logger.debug(f"[{self.account_name}] 检查页面状态时出错: {e}")
@@ -472,36 +374,14 @@ class LinuxDOAdapter(BasePlatformAdapter):
         Returns:
             是否通过 Cloudflare 验证
         """
-        # 支持通过环境变量调优，保持 nodriver + 非 headless + 多次重试
-        env_retries = os.environ.get("LINUXDO_CF_MAX_RETRIES", "").strip()
-        if env_retries.isdigit():
-            max_retries = max(1, int(env_retries))
-
-        timeout_first = 60
-        timeout_retry = 40
-        env_timeout_first = os.environ.get("LINUXDO_CF_TIMEOUT_FIRST", "").strip()
-        env_timeout_retry = os.environ.get("LINUXDO_CF_TIMEOUT_RETRY", "").strip()
-        if env_timeout_first.isdigit():
-            timeout_first = max(20, int(env_timeout_first))
-        if env_timeout_retry.isdigit():
-            timeout_retry = max(20, int(env_timeout_retry))
-
+        # 指数退避等待时间（秒）
         retry_delays = [5, 15, 30]
-        env_retry_delays = os.environ.get("LINUXDO_CF_RETRY_DELAYS", "").strip()
-        if env_retry_delays:
-            parsed_delays = []
-            for part in env_retry_delays.split(","):
-                part = part.strip()
-                if part.isdigit():
-                    parsed_delays.append(max(1, int(part)))
-            if parsed_delays:
-                retry_delays = parsed_delays
 
         for attempt in range(max_retries):
             logger.info(f"[{self.account_name}] Cloudflare 验证尝试 {attempt + 1}/{max_retries}...")
 
-            # 第一次尝试给更长超时（含 8 秒初始等待），后续稍短
-            timeout = timeout_first if attempt == 0 else timeout_retry
+            # 第一次尝试用较长超时，后续用较短超时
+            timeout = 30 if attempt == 0 else 20
 
             # 等待 Cloudflare 验证
             cf_passed = await self._wait_for_cloudflare_nodriver(tab, timeout=timeout)
@@ -527,7 +407,7 @@ class LinuxDOAdapter(BasePlatformAdapter):
             # 刷新页面重新尝试
             logger.info(f"[{self.account_name}] 刷新页面...")
             await tab.reload()
-            await asyncio.sleep(5)  # 等待页面开始加载
+            await asyncio.sleep(3)  # 等待页面开始加载
 
         return False
 
