@@ -9,7 +9,6 @@ on:
       platform:
         description: '指定平台（留空运行全部）'
         required: false
-        type: string
       debug:
         description: '开启 Debug 模式（截图+详细日志）'
         required: false
