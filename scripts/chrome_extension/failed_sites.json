@@ -1,8 +1,32 @@
 {
-  "generated_at": "2026-02-07T05:32:33.044683+00:00",
+  "generated_at": "2026-02-07T06:52:01.071667+00:00",
   "source": "github_actions",
-  "failed_count": 16,
+  "failed_count": 18,
   "failed_sites": [
+    {
+      "provider": "ldoh_api_daiju_live",
+      "account_name": "主账号_ldoh_api_daiju_live",
+      "api_user": "",
+      "platform": "NewAPI (ldoh_api_daiju_live)",
+      "site_url": "https://api.daiju.live",
+      "login_url": "https://api.daiju.live/login",
+      "oauth_login_url": "https://api.daiju.live/auth/login?returnTo=%2F",
+      "reason": "HTTP 403 被拦截(Cookie过期或Cloudflare)",
+      "needs_manual_auth": true,
+      "oauth_cookie_blocked": true
+    },
+    {
+      "provider": "nhh",
+      "account_name": "主账号_nhh",
+      "api_user": "",
+      "platform": "NewAPI (nhh)",
+      "site_url": "https://new.123nhh.xyz",
+      "login_url": "https://new.123nhh.xyz/login",
+      "oauth_login_url": "https://new.123nhh.xyz/auth/login?returnTo=%2F",
+      "reason": "OAuth 超时（>120s）",
+      "needs_manual_auth": true,
+      "oauth_cookie_blocked": false
+    },
     {
       "provider": "kfcapi",
       "account_name": "主账号_kfcapi",
@@ -11,33 +35,9 @@
       "site_url": "https://kfc-api.sxxe.net",
       "login_url": "https://kfc-api.sxxe.net/login",
       "oauth_login_url": "https://kfc-api.sxxe.net/auth/login?returnTo=%2F",
-      "reason": "LinuxDO 登录失败",
+      "reason": "OAuth 超时（>120s）",
       "needs_manual_auth": true,
-      "oauth_cookie_blocked": true
-    },
-    {
-      "provider": "lightllm",
-      "account_name": "主账号_lightllm",
-      "api_user": "",
-      "platform": "NewAPI (lightllm)",
-      "site_url": "https://lightllm.online",
-      "login_url": "https://lightllm.online/login",
-      "oauth_login_url": "https://lightllm.online/auth/login?returnTo=%2F",
-      "reason": "LinuxDO 登录失败",
-      "needs_manual_auth": true,
-      "oauth_cookie_blocked": true
-    },
-    {
-      "provider": "elysiver",
-      "account_name": "主账号_elysiver",
-      "api_user": "",
-      "platform": "NewAPI (elysiver)",
-      "site_url": "https://elysiver.h-e.top",
-      "login_url": "https://elysiver.h-e.top/login",
-      "oauth_login_url": "https://elysiver.h-e.top/auth/login?returnTo=%2F",
-      "reason": "LinuxDO 登录失败",
-      "needs_manual_auth": true,
-      "oauth_cookie_blocked": true
+      "oauth_cookie_blocked": false
     },
     {
       "provider": "hotaru",
@@ -47,45 +47,33 @@
       "site_url": "https://api.hotaruapi.top",
       "login_url": "https://api.hotaruapi.top/login",
       "oauth_login_url": "https://api.hotaruapi.top/auth/login?returnTo=%2F",
-      "reason": "OAuth 登录失败，无法获取 session",
+      "reason": "OAuth 超时（>120s）",
       "needs_manual_auth": true,
-      "oauth_cookie_blocked": true
+      "oauth_cookie_blocked": false
     },
     {
-      "provider": "wong",
-      "account_name": "主账号_wong",
+      "provider": "ldoh_router_tumuer_me",
+      "account_name": "主账号_ldoh_router_tumuer_me",
       "api_user": "",
-      "platform": "NewAPI (wong)",
-      "site_url": "https://wzw.pp.ua",
-      "login_url": "https://wzw.pp.ua/login",
-      "oauth_login_url": "https://wzw.pp.ua/auth/login?returnTo=%2F",
-      "reason": "LinuxDO 登录失败",
+      "platform": "NewAPI (ldoh_router_tumuer_me)",
+      "site_url": "https://router.tumuer.me",
+      "login_url": "https://router.tumuer.me/login",
+      "oauth_login_url": "https://router.tumuer.me/auth/login?returnTo=%2F",
+      "reason": "OAuth 超时（>120s）",
       "needs_manual_auth": true,
-      "oauth_cookie_blocked": true
+      "oauth_cookie_blocked": false
     },
     {
-      "provider": "runanytime",
-      "account_name": "主账号_runanytime",
+      "provider": "lightllm",
+      "account_name": "主账号_lightllm",
       "api_user": "",
-      "platform": "NewAPI (runanytime)",
-      "site_url": "https://runanytime.hxi.me",
-      "login_url": "https://runanytime.hxi.me/login",
-      "oauth_login_url": "https://runanytime.hxi.me/auth/login?returnTo=%2F",
-      "reason": "LinuxDO 登录失败",
+      "platform": "NewAPI (lightllm)",
+      "site_url": "https://lightllm.online",
+      "login_url": "https://lightllm.online/login",
+      "oauth_login_url": "https://lightllm.online/auth/login?returnTo=%2F",
+      "reason": "OAuth 超时（>120s）",
       "needs_manual_auth": true,
-      "oauth_cookie_blocked": true
-    },
-    {
-      "provider": "xiaolajiao",
-      "account_name": "主账号_xiaolajiao",
-      "api_user": "",
-      "platform": "NewAPI (xiaolajiao)",
-      "site_url": "https://yyds.215.im",
-      "login_url": "https://yyds.215.im/login",
-      "oauth_login_url": "https://yyds.215.im/auth/login?returnTo=%2F",
-      "reason": "LinuxDO 登录失败",
-      "needs_manual_auth": true,
-      "oauth_cookie_blocked": true
+      "oauth_cookie_blocked": false
     },
     {
       "provider": "ibsgss",
@@ -95,33 +83,45 @@
       "site_url": "https://codex.ibsgss.uk",
       "login_url": "https://codex.ibsgss.uk/login",
       "oauth_login_url": "https://codex.ibsgss.uk/auth/login?returnTo=%2F",
-      "reason": "LinuxDO 登录失败",
+      "reason": "OAuth 超时（>120s）",
       "needs_manual_auth": true,
-      "oauth_cookie_blocked": true
+      "oauth_cookie_blocked": false
     },
     {
-      "provider": "muyuan",
-      "account_name": "主账号_muyuan",
+      "provider": "elysiver",
+      "account_name": "主账号_elysiver",
       "api_user": "",
-      "platform": "NewAPI (muyuan)",
-      "site_url": "https://newapi.linuxdo.edu.rs",
-      "login_url": "https://newapi.linuxdo.edu.rs/login",
-      "oauth_login_url": "https://newapi.linuxdo.edu.rs/auth/login?returnTo=%2F",
-      "reason": "LinuxDO 登录失败",
+      "platform": "NewAPI (elysiver)",
+      "site_url": "https://elysiver.h-e.top",
+      "login_url": "https://elysiver.h-e.top/login",
+      "oauth_login_url": "https://elysiver.h-e.top/auth/login?returnTo=%2F",
+      "reason": "OAuth 超时（>120s）",
       "needs_manual_auth": true,
-      "oauth_cookie_blocked": true
+      "oauth_cookie_blocked": false
     },
     {
-      "provider": "yx",
-      "account_name": "主账号_yx",
+      "provider": "ldoh_linuxdoapi_223384_xyz",
+      "account_name": "主账号_ldoh_linuxdoapi_223384_xyz",
       "api_user": "",
-      "platform": "NewAPI (yx)",
-      "site_url": "https://api.dx001.ggff.net",
-      "login_url": "https://api.dx001.ggff.net/login",
-      "oauth_login_url": "https://api.dx001.ggff.net/auth/login?returnTo=%2F",
-      "reason": "LinuxDO 登录失败",
+      "platform": "NewAPI (ldoh_linuxdoapi_223384_xyz)",
+      "site_url": "https://linuxdoapi.223384.xyz",
+      "login_url": "https://linuxdoapi.223384.xyz/login",
+      "oauth_login_url": "https://linuxdoapi.223384.xyz/auth/login?returnTo=%2F",
+      "reason": "OAuth 超时（>120s）",
       "needs_manual_auth": true,
-      "oauth_cookie_blocked": true
+      "oauth_cookie_blocked": false
+    },
+    {
+      "provider": "ldoh_api_usegemini_xyz",
+      "account_name": "主账号_ldoh_api_usegemini_xyz",
+      "api_user": "",
+      "platform": "NewAPI (ldoh_api_usegemini_xyz)",
+      "site_url": "https://api.usegemini.xyz",
+      "login_url": "https://api.usegemini.xyz/login",
+      "oauth_login_url": "https://api.usegemini.xyz/auth/login?returnTo=%2F",
+      "reason": "OAuth 超时（>120s）",
+      "needs_manual_auth": true,
+      "oauth_cookie_blocked": false
     },
     {
       "provider": "zeabur",
@@ -131,33 +131,33 @@
       "site_url": "https://openai.api-test.us.ci",
       "login_url": "https://openai.api-test.us.ci/login",
       "oauth_login_url": "https://openai.api-test.us.ci/auth/login?returnTo=%2F",
-      "reason": "LinuxDO 登录失败",
+      "reason": "OAuth 超时（>120s）",
       "needs_manual_auth": true,
-      "oauth_cookie_blocked": true
+      "oauth_cookie_blocked": false
     },
     {
-      "provider": "dev88",
-      "account_name": "主账号_dev88",
+      "provider": "muyuan",
+      "account_name": "主账号_muyuan",
       "api_user": "",
-      "platform": "NewAPI (dev88)",
-      "site_url": "https://api.dev88.tech",
-      "login_url": "https://api.dev88.tech/login",
-      "oauth_login_url": "https://api.dev88.tech/auth/login?returnTo=%2F",
-      "reason": "LinuxDO 登录失败",
+      "platform": "NewAPI (muyuan)",
+      "site_url": "https://newapi.linuxdo.edu.rs",
+      "login_url": "https://newapi.linuxdo.edu.rs/login",
+      "oauth_login_url": "https://newapi.linuxdo.edu.rs/auth/login?returnTo=%2F",
+      "reason": "OAuth 超时（>120s）",
       "needs_manual_auth": true,
-      "oauth_cookie_blocked": true
+      "oauth_cookie_blocked": false
     },
     {
-      "provider": "translate6655",
-      "account_name": "主账号_translate6655",
+      "provider": "ldoh_mb666_zeabur_app",
+      "account_name": "主账号_ldoh_mb666_zeabur_app",
       "api_user": "",
-      "platform": "NewAPI (translate6655)",
-      "site_url": "https://translate-api.6655.pp.ua",
-      "login_url": "https://translate-api.6655.pp.ua/login",
-      "oauth_login_url": "https://translate-api.6655.pp.ua/auth/login?returnTo=%2F",
-      "reason": "LinuxDO 登录失败",
+      "platform": "NewAPI (ldoh_mb666_zeabur_app)",
+      "site_url": "https://mb666.zeabur.app",
+      "login_url": "https://mb666.zeabur.app/login",
+      "oauth_login_url": "https://mb666.zeabur.app/auth/login?returnTo=%2F",
+      "reason": "OAuth 超时（>120s）",
       "needs_manual_auth": true,
-      "oauth_cookie_blocked": true
+      "oauth_cookie_blocked": false
     },
     {
       "provider": "moyu",
@@ -167,9 +167,45 @@
       "site_url": "https://clove.cc.cd",
       "login_url": "https://clove.cc.cd/login",
       "oauth_login_url": "https://clove.cc.cd/auth/login?returnTo=%2F",
-      "reason": "LinuxDO 登录失败",
+      "reason": "OAuth 超时（>120s）",
       "needs_manual_auth": true,
-      "oauth_cookie_blocked": true
+      "oauth_cookie_blocked": false
+    },
+    {
+      "provider": "ldoh_ai_qaq_al",
+      "account_name": "主账号_ldoh_ai_qaq_al",
+      "api_user": "",
+      "platform": "NewAPI (ldoh_ai_qaq_al)",
+      "site_url": "https://ai.qaq.al",
+      "login_url": "https://ai.qaq.al/login",
+      "oauth_login_url": "https://ai.qaq.al/auth/login?returnTo=%2F",
+      "reason": "OAuth 超时（>120s）",
+      "needs_manual_auth": true,
+      "oauth_cookie_blocked": false
+    },
+    {
+      "provider": "wong",
+      "account_name": "主账号_wong",
+      "api_user": "",
+      "platform": "NewAPI (wong)",
+      "site_url": "https://wzw.pp.ua",
+      "login_url": "https://wzw.pp.ua/login",
+      "oauth_login_url": "https://wzw.pp.ua/auth/login?returnTo=%2F",
+      "reason": "OAuth 超时（>120s）",
+      "needs_manual_auth": true,
+      "oauth_cookie_blocked": false
+    },
+    {
+      "provider": "ldoh_cloudapi_wdyu_eu_cc",
+      "account_name": "主账号_ldoh_cloudapi_wdyu_eu_cc",
+      "api_user": "",
+      "platform": "NewAPI (ldoh_cloudapi_wdyu_eu_cc)",
+      "site_url": "https://cloudapi.wdyu.eu.cc",
+      "login_url": "https://cloudapi.wdyu.eu.cc/login",
+      "oauth_login_url": "https://cloudapi.wdyu.eu.cc/auth/login?returnTo=%2F",
+      "reason": "OAuth 超时（>120s）",
+      "needs_manual_auth": true,
+      "oauth_cookie_blocked": false
     },
     {
       "provider": "baqi",
@@ -179,21 +215,9 @@
       "site_url": "https://ai.121628.xyz",
       "login_url": "https://ai.121628.xyz/login",
       "oauth_login_url": "https://ai.121628.xyz/auth/login?returnTo=%2F",
-      "reason": "LinuxDO 登录失败",
+      "reason": "OAuth 超时（>120s）",
       "needs_manual_auth": true,
-      "oauth_cookie_blocked": true
-    },
-    {
-      "provider": "techstar",
-      "account_name": "主账号_techstar",
-      "api_user": "",
-      "platform": "NewAPI (techstar)",
-      "site_url": "https://aidrouter.qzz.io",
-      "login_url": "https://aidrouter.qzz.io/login",
-      "oauth_login_url": "https://aidrouter.qzz.io/auth/login?returnTo=%2F",
-      "reason": "LinuxDO 登录失败",
-      "needs_manual_auth": true,
-      "oauth_cookie_blocked": true
+      "oauth_cookie_blocked": false
     }
   ]
 }
