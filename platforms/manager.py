@@ -1065,16 +1065,31 @@ class PlatformManager:
     async def _run_all_newapi(self) -> list[CheckinResult]:
         """运行所有 NewAPI 站点签到
 
-        两种模式：
-        1. 手动模式：NEWAPI_ACCOUNTS 已配置 → 按账号签到（Cookie+API，失败回退OAuth）
-        2. 自动模式：NEWAPI_ACCOUNTS 未配置但有 LINUXDO_ACCOUNTS → 自动遍历所有站点 OAuth 签到
+        仅自动模式：
+        - 必须配置 LINUXDO_ACCOUNTS
+        - NEWAPI_ACCOUNTS 仅作为 seed cookie 补充来源，不再作为独立执行模式
         """
-        if self.config.anyrouter_accounts:
-            return await self._run_newapi_with_accounts()
-        elif self._linuxdo_accounts:
-            logger.info("NEWAPI_ACCOUNTS 未配置，使用 LINUXDO_ACCOUNTS 自动发现并签到所有站点")
-            return await self._run_newapi_auto_oauth()
-        return []
+        if not self._linuxdo_accounts:
+            logger.warning("未配置 LINUXDO_ACCOUNTS，自动模式无法执行")
+            return []
+        logger.info("使用仅自动模式：以 LINUXDO_ACCOUNTS 遍历站点，NEWAPI_ACCOUNTS 仅作为 seed cookie")
+        return await self._run_newapi_auto_oauth()
+
+    def _build_seed_accounts_by_provider(self) -> dict[str, AnyRouterAccount]:
+        """构建 NEWAPI_ACCOUNTS seed 映射（provider -> AnyRouterAccount）。"""
+        seeds: dict[str, AnyRouterAccount] = {}
+        for idx, account in enumerate(self.config.anyrouter_accounts):
+            provider = (account.provider or "").strip().lower()
+            if not provider:
+                continue
+            session = self._extract_session_cookie(account.cookies)
+            api_user = str(account.api_user or "").strip()
+            if not session or not api_user:
+                continue
+            # 同 provider 多条时，优先使用后者（通常是用户最新覆盖）
+            seeds[provider] = account
+            logger.debug(f"[seed] provider={provider}, account={account.get_display_name(idx)}")
+        return seeds
 
     async def _run_newapi_auto_oauth(self) -> list[CheckinResult]:
         """自动模式：用 LinuxDO 账号遍历所有 NewAPI 站点，自动 OAuth 登录签到
@@ -1111,6 +1126,9 @@ class PlatformManager:
         linuxdo_name = linuxdo_account.get("name", linuxdo_username)
 
         logger.info(f"自动模式: 使用 LinuxDO 账号 [{linuxdo_name}] 遍历站点")
+        seed_accounts = self._build_seed_accounts_by_provider()
+        if seed_accounts:
+            logger.info(f"自动模式: 加载 NEWAPI_ACCOUNTS seed cookie {len(seed_accounts)} 个 provider")
 
         # 本地兜底站点（LDOH 同步失败时使用）
         providers_to_test = self._get_local_auto_providers()
@@ -1194,7 +1212,38 @@ class PlatformManager:
         for provider_name, provider in providers_to_test.items():
             account_name = f"{linuxdo_name}_{provider_name}"
 
-            # 1. 优先尝试缓存的 Cookie
+            # 1. 优先尝试 NEWAPI_ACCOUNTS seed cookie（补充来源，不是主流程）
+            seed_account = seed_accounts.get(provider_name)
+            if seed_account:
+                logger.info(f"[{account_name}] 发现 NEWAPI_ACCOUNTS seed，优先尝试")
+                try:
+                    seed_result = await self._checkin_newapi(seed_account, provider, account_name)
+                    if seed_result.status == CheckinStatus.SUCCESS:
+                        seed_result.message = f"{seed_result.message} (NEWAPI_ACCOUNTS seed)"
+                        if seed_result.details is None:
+                            seed_result.details = {}
+                        seed_result.details["login_method"] = "newapi_accounts_seed"
+                        results.append(seed_result)
+                        # seed 成功后同步写入持久化缓存
+                        seed_session = self._extract_session_cookie(seed_account.cookies)
+                        if seed_session and seed_account.api_user:
+                            self._cookie_cache.save(
+                                provider_name, account_name, seed_session, str(seed_account.api_user)
+                            )
+                        logger.success(f"[{account_name}] NEWAPI_ACCOUNTS seed 签到成功")
+                        continue
+
+                    seed_msg = seed_result.message or ""
+                    if "401" in seed_msg or "403" in seed_msg or "过期" in seed_msg:
+                        logger.warning(f"[{account_name}] NEWAPI_ACCOUNTS seed 已失效，继续尝试缓存/OAuth")
+                    else:
+                        logger.warning(f"[{account_name}] NEWAPI_ACCOUNTS seed 失败: {seed_msg}")
+                        results.append(seed_result)
+                        continue
+                except Exception as e:
+                    logger.warning(f"[{account_name}] NEWAPI_ACCOUNTS seed 尝试异常: {e}")
+
+            # 2. 尝试 GitHub 持久化缓存 Cookie
             cached = self._cookie_cache.get(provider_name, account_name)
             if cached:
                 stats["cookie_hit"] = int(stats["cookie_hit"]) + 1
@@ -1233,7 +1282,7 @@ class PlatformManager:
                     self._cookie_cache.invalidate(provider_name, account_name)
                     stats["cookie_invalidated"] = int(stats["cookie_invalidated"]) + 1
 
-            # 2. 无缓存或缓存失效，标记为需要 OAuth
+            # 3. seed/cache 均不可用，标记为需要 OAuth
             need_oauth.append({
                 "provider": provider,
                 "provider_name": provider_name,

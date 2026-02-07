@@ -1,65 +1,46 @@
-# NewAPI 签到配置提取器 - Chrome 扩展
+# NEWAPI 人工补录 Chrome 扩展
 
-一键提取 NewAPI 站点的 session cookie 和 api_user，生成签到配置 JSON。
+这个扩展专门用于 **GitHub Action 签到后人工补录**。
 
-## 安装方法
+目标流程：
+1. GitHub Action 跑完后，自动更新 `scripts/chrome_extension/failed_sites.json`
+2. 本地 `git pull`
+3. 打开扩展，点击“一键打开失败站点”
+4. 你在浏览器里人工登录这些站点
+5. 回到扩展，点击“提取失败站点 Cookie”
+6. 复制生成结果，粘贴到 GitHub Secret `NEWAPI_ACCOUNTS`
 
-1. 打开 Chrome/Edge 浏览器，进入扩展管理页面：
-   - Chrome: `chrome://extensions/`
-   - Edge: `edge://extensions/`
+## 安装
 
-2. 开启右上角的「开发者模式」
+1. 打开 `chrome://extensions/` 或 `edge://extensions/`
+2. 开启“开发者模式”
+3. 选择“加载已解压的扩展程序”
+4. 选择目录：`scripts/chrome_extension`
 
-3. 点击「加载已解压的扩展程序」
+## 使用说明
 
-4. 选择 `scripts/chrome_extension` 文件夹
+### 1) 刷新失败清单
+- 扩展会读取本地目录中的 `failed_sites.json`
+- 如果提示读取失败，先确认仓库已 `pull` 到最新
 
-5. 扩展安装完成！
+### 2) 一键打开失败站点
+- 按失败清单批量打开登录页
+- 你手动登录（用于拿到最新 session cookie）
 
-## 使用方法
+### 3) 生成 NEWAPI_ACCOUNTS
+- 可选：先粘贴当前 `NEWAPI_ACCOUNTS`（用于合并）
+- 点击“提取失败站点 Cookie”
+- 扩展会按失败清单站点读取 `session` cookie，并尝试补齐 `api_user`
+- 自动按 `provider + api_user` 去重，新的覆盖旧的
 
-1. **先登录各 NewAPI 站点**（在浏览器中正常登录）
+### 4) 复制到 GitHub
+- 点击“复制结果 JSON”
+- 贴到 GitHub Secret：`NEWAPI_ACCOUNTS`
 
-2. **打开任意一个已登录的站点页面**（保持标签页打开）
+## 说明
 
-3. 点击浏览器工具栏的扩展图标 🔑
-
-4. 点击「📦 提取签到配置」
-
-5. 等待提取完成，点击「📋 复制 JSON 到剪贴板」
-
-6. 粘贴到 GitHub Secrets → `NEWAPI_ACCOUNTS`
-
-## 失败站点联动（GitHub Action）
-
-- Action 会把签到失败站点写入 `failed_sites.json`
-- 本地 `git pull` 后，扩展可直接：
-  - 一键打开失败站点页面
-  - 复制失败账号模板（占位 `session`）
-  - 生成可直接粘贴到 `NEWAPI_ACCOUNTS` 的 JSON（会合并本地已提取配置，AnyRouter 失败项会补占位）
-
-## 支持的站点
-
-- WONG公益站 (wzw.pp.ua)
-- Elysiver (elysiver.h-e.top)
-- KFC API (kfc-api.sxxe.net)
-- Free DuckCoding (free.duckcoding.com)
-- 随时跑路 (runanytime.hxi.me)
-- NEB公益站 (ai.zzhdsgsss.xyz)
-- Mitchll-api (api.mitchll.com)
-- AnyRouter (anyrouter.top)
-
-## 注意事项
-
-- ⚠️ 提取 api_user 需要**打开对应站点的标签页**
-- 如果显示 ⚠️ 表示找到了 session 但没获取到 api_user
-- 如果显示 ❌ 表示未登录该站点
-
-## 图标
-
-扩展需要图标文件，可以用任意 PNG 图片：
-- `icon16.png` - 16x16 像素
-- `icon48.png` - 48x48 像素  
-- `icon128.png` - 128x128 像素
-
-如果没有图标，可以用在线工具生成：https://favicon.io/
+- 若某站点提取失败，通常是：
+  - 还没登录成功
+  - 没有 `session` cookie
+  - 缺失 `api_user`
+- 扩展会在提取结果里列出失败项，便于你继续补录。
