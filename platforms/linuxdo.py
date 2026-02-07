@@ -17,6 +17,7 @@ Discourse API:
 import asyncio
 import contextlib
 import json
+import os
 import random
 import time
 from pathlib import Path
@@ -230,10 +231,9 @@ class LinuxDOAdapter(BasePlatformAdapter):
         使用 nodriver（最强反检测），在 CI 环境中增加重试次数。
         配合 Xvfb 使用非 headless 模式以绕过 Cloudflare 检测。
         """
-        import os
-
         engine = get_browser_engine()
-        fallback_engine = os.environ.get("BROWSER_FALLBACK_ENGINE", "patchright").lower()
+        # 默认不回退，避免在 Cloudflare 场景下切换引擎导致额外不稳定
+        fallback_engine = os.environ.get("BROWSER_FALLBACK_ENGINE", "").strip().lower()
         logger.info(f"[{self.account_name}] 使用浏览器引擎: {engine}")
 
         # CI 环境检测
@@ -267,7 +267,26 @@ class LinuxDOAdapter(BasePlatformAdapter):
             max_retries = 5 if (is_ci and candidate == "nodriver") else 3
 
             try:
-                self._browser_manager = BrowserManager(engine=candidate, headless=headless)
+                user_data_dir = None
+                if candidate == "nodriver":
+                    persist_profile = os.environ.get("LINUXDO_NODRIVER_PERSIST_PROFILE", "true").lower() == "true"
+                    if persist_profile:
+                        profile_root = Path(os.environ.get("LINUXDO_NODRIVER_PROFILE_DIR", ".nodriver_profiles"))
+                        profile_root.mkdir(parents=True, exist_ok=True)
+                        safe_account_name = "".join(
+                            ch if ch.isalnum() or ch in ("-", "_", ".") else "_"
+                            for ch in self.account_name
+                        ).strip("._")
+                        if not safe_account_name:
+                            safe_account_name = "default"
+                        user_data_dir = str(profile_root / safe_account_name)
+                        logger.info(f"[{self.account_name}] nodriver 复用配置目录: {user_data_dir}")
+
+                self._browser_manager = BrowserManager(
+                    engine=candidate,
+                    headless=headless,
+                    user_data_dir=user_data_dir,
+                )
                 await self._browser_manager.start(max_retries=max_retries)
 
                 # 获取实际使用的引擎（兼容 BrowserManager 内部 fallback）
@@ -319,6 +338,12 @@ class LinuxDOAdapter(BasePlatformAdapter):
             try:
                 # 获取页面标题
                 title = await tab.evaluate("document.title")
+                current_url = ""
+                with contextlib.suppress(Exception):
+                    current_url = getattr(tab.target, "url", "") or ""
+                if not current_url:
+                    with contextlib.suppress(Exception):
+                        current_url = await tab.evaluate("location.href || ''")
 
                 # Cloudflare 挑战页面的特征
                 cf_indicators = [
@@ -331,13 +356,17 @@ class LinuxDOAdapter(BasePlatformAdapter):
                 ]
 
                 title_lower = title.lower() if title else ""
+                url_lower = current_url.lower() if current_url else ""
 
                 # 检测 Turnstile iframe 是否存在
                 has_cf_element = await tab.evaluate(r"""
                     (function() {
                         const iframes = document.querySelectorAll('iframe');
                         for (const iframe of iframes) {
-                            if ((iframe.src || '').includes('challenges.cloudflare.com')) return true;
+                            if ((iframe.src || '').includes('challenges.cloudflare.com')) {
+                                const rect = iframe.getBoundingClientRect();
+                                if (rect.width > 10 && rect.height > 10) return true;
+                            }
                         }
                         if (document.querySelector('.cf-turnstile, div[data-sitekey]')) return true;
                         const bodyText = document.body?.innerText || '';
@@ -347,10 +376,19 @@ class LinuxDOAdapter(BasePlatformAdapter):
                 """)
 
                 # 检查是否还在 Cloudflare 挑战中
-                is_cf_page = any(ind in title_lower for ind in cf_indicators) or has_cf_element
+                in_cf_challenge_url = "/cdn-cgi/challenge-platform" in url_lower
+                is_cf_page = any(ind in title_lower for ind in cf_indicators) or has_cf_element or in_cf_challenge_url
 
-                if not is_cf_page and title and "linux" in title_lower:
-                    logger.success(f"[{self.account_name}] Cloudflare 挑战通过！页面标题: {title}")
+                # 优先基于 URL 判定通过，避免 title 短暂空值导致误判
+                if (
+                    not is_cf_page
+                    and "linux.do" in url_lower
+                    and "/cdn-cgi/challenge-platform" not in url_lower
+                ):
+                    logger.success(
+                        f"[{self.account_name}] Cloudflare 挑战通过！URL: {current_url or 'N/A'} "
+                        f"标题: {title or 'N/A'}"
+                    )
                     return True
 
                 # 前 8 秒只等待，不点击
@@ -397,11 +435,13 @@ class LinuxDOAdapter(BasePlatformAdapter):
 
                             x = _to_float(iframe_rect[0])
                             y = _to_float(iframe_rect[1])
+                            w = _to_float(iframe_rect[2])
                             h = _to_float(iframe_rect[3])
                             method = iframe_rect[4] if len(iframe_rect) > 4 else 'N/A'
 
-                            click_x = x + 30
-                            click_y = y + h / 2
+                            offset_x = max(20.0, min(40.0, w * 0.2))
+                            click_x = x + offset_x + random.uniform(-2.0, 2.0)
+                            click_y = y + h / 2 + random.uniform(-1.5, 1.5)
 
                             logger.info(
                                 f"[{self.account_name}] 发现 Turnstile ({method}), "
@@ -436,14 +476,36 @@ class LinuxDOAdapter(BasePlatformAdapter):
         Returns:
             是否通过 Cloudflare 验证
         """
-        # 指数退避等待时间（秒）
+        # 支持通过环境变量调优，保持 nodriver + 非 headless + 多次重试
+        env_retries = os.environ.get("LINUXDO_CF_MAX_RETRIES", "").strip()
+        if env_retries.isdigit():
+            max_retries = max(1, int(env_retries))
+
+        timeout_first = 60
+        timeout_retry = 40
+        env_timeout_first = os.environ.get("LINUXDO_CF_TIMEOUT_FIRST", "").strip()
+        env_timeout_retry = os.environ.get("LINUXDO_CF_TIMEOUT_RETRY", "").strip()
+        if env_timeout_first.isdigit():
+            timeout_first = max(20, int(env_timeout_first))
+        if env_timeout_retry.isdigit():
+            timeout_retry = max(20, int(env_timeout_retry))
+
         retry_delays = [5, 15, 30]
+        env_retry_delays = os.environ.get("LINUXDO_CF_RETRY_DELAYS", "").strip()
+        if env_retry_delays:
+            parsed_delays = []
+            for part in env_retry_delays.split(","):
+                part = part.strip()
+                if part.isdigit():
+                    parsed_delays.append(max(1, int(part)))
+            if parsed_delays:
+                retry_delays = parsed_delays
 
         for attempt in range(max_retries):
             logger.info(f"[{self.account_name}] Cloudflare 验证尝试 {attempt + 1}/{max_retries}...")
 
             # 第一次尝试给更长超时（含 8 秒初始等待），后续稍短
-            timeout = 60 if attempt == 0 else 40
+            timeout = timeout_first if attempt == 0 else timeout_retry
 
             # 等待 Cloudflare 验证
             cf_passed = await self._wait_for_cloudflare_nodriver(tab, timeout=timeout)
