@@ -164,16 +164,16 @@ jobs:
               echo "### Failed Sites Report"
               echo '```json'
               python - <<'PY'
-import json
-from pathlib import Path
-p = Path("scripts/chrome_extension/failed_sites.json")
-data = json.loads(p.read_text(encoding="utf-8"))
-print(json.dumps({
-    "generated_at": data.get("generated_at"),
-    "failed_count": data.get("failed_count", 0),
-    "sample": (data.get("failed_sites") or [])[:5],
-}, ensure_ascii=False, indent=2))
-PY
+              import json
+              from pathlib import Path
+              p = Path("scripts/chrome_extension/failed_sites.json")
+              data = json.loads(p.read_text(encoding="utf-8"))
+              print(json.dumps({
+                  "generated_at": data.get("generated_at"),
+                  "failed_count": data.get("failed_count", 0),
+                  "sample": (data.get("failed_sites") or [])[:5],
+              }, ensure_ascii=False, indent=2))
+              PY
               echo '```'
             else
               echo "### Failed Sites Report"
