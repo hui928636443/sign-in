@@ -10,6 +10,7 @@
     "username": "second_account@example.com",
     "password": "second_password",
     "name": "小号",
-    "browse_minutes": 60
+    "browse_minutes": 60,
+    "exclude_sites": ["anyrouter", "agentrouter", "wong"]
   }
 ]

@@ -284,17 +284,22 @@ class LinuxDOAccount:
     - name: 账号显示名称（可选）
     - browse_minutes: 浏览时长（分钟，可选，默认 20）
     - sites: 要签到的站点列表（可选，默认空，仅浏览主站）
-    - checkin_sites: 要签到的 NewAPI 站点列表（可选）
+    - checkin_sites: 要签到的 NewAPI 站点列表（可选，白名单模式）
         - 空列表 / 不设置 → 签到所有可用站点（默认行为）
         - 非空列表 → 仅签到指定站点，如 ["kfcapi", "duckcoding", "runanytime"]
         - 站点 ID 见 DEFAULT_PROVIDERS 字典的 key
+    - exclude_sites: 要排除的 NewAPI 站点列表（可选，黑名单模式）
+        - 空列表 / 不设置 → 不排除任何站点（默认行为）
+        - 非空列表 → 跳过指定站点，如 ["anyrouter", "agentrouter"]
+        - 与 checkin_sites 同时存在时，先取白名单交集，再排除黑名单
     """
 
     username: str | None = None
     password: str | None = None
     cookies: dict | str | None = None  # Cookie 优先登录
     sites: list[str] = field(default_factory=list)  # 默认不签到任何站点，仅浏览主站
-    checkin_sites: list[str] = field(default_factory=list)  # 空=签到所有站点，非空=仅签到指定站点
+    checkin_sites: list[str] = field(default_factory=list)  # 空=签到所有站点，非空=仅签到指定站点（白名单）
+    exclude_sites: list[str] = field(default_factory=list)  # 空=不排除，非空=跳过指定站点（黑名单）
     browse_minutes: int = 20  # 浏览时长（分钟），默认 20 分钟
     name: str | None = None
 
@@ -305,10 +310,15 @@ class LinuxDOAccount:
         # 默认不签到任何站点（仅浏览主站）
         sites = data.get("sites", [])
 
-        # checkin_sites: 空列表=签到所有站点（默认），非空=仅签到指定站点
+        # checkin_sites: 空列表=签到所有站点（默认），非空=仅签到指定站点（白名单）
         checkin_sites = data.get("checkin_sites", [])
         if not isinstance(checkin_sites, list):
             checkin_sites = []
+
+        # exclude_sites: 空列表=不排除（默认），非空=跳过指定站点（黑名单）
+        exclude_sites = data.get("exclude_sites", [])
+        if not isinstance(exclude_sites, list):
+            exclude_sites = []
 
         # browse_minutes 默认 20 分钟
         browse_minutes = data.get("browse_minutes", 20)
@@ -322,6 +332,7 @@ class LinuxDOAccount:
             cookies=cookies,
             sites=sites,
             checkin_sites=checkin_sites,
+            exclude_sites=exclude_sites,
             browse_minutes=browse_minutes,
             name=name,
         )
@@ -716,7 +727,8 @@ class AppConfig:
             "password": "your_password",
             "name": "主账号",                               // 可选，显示名称
             "browse_minutes": 30,                           // 可选，浏览时长（分钟）
-            "checkin_sites": ["kfcapi", "duckcoding"],      // 可选，指定签到站点（不设置=签到全部）
+            "checkin_sites": ["kfcapi", "duckcoding"],      // 可选，白名单：仅签到指定站点（不设置=签到全部）
+            "exclude_sites": ["anyrouter", "agentrouter"],  // 可选，黑名单：跳过指定站点（不设置=不排除）
             "sites": ["wong", "elysiver"]                   // 可选，默认所有站点
         }
         """
