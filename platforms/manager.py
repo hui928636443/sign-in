@@ -2540,12 +2540,14 @@ class PlatformManager:
                 # 2. 执行签到（如果需要）
                 if provider.needs_manual_check_in():
                     sign_in_path = provider.sign_in_path
+                    # 签到 POST 请求需要额外的 Content-Type 和 X-Requested-With 头
+                    checkin_fetch_headers = {**fetch_headers, "Content-Type": "application/json", "X-Requested-With": "XMLHttpRequest"}
                     try:
                         resp = await page.evaluate(f"""
                             async () => {{
                                 const r = await fetch('{sign_in_path}', {{
                                     method: 'POST',
-                                    headers: {json.dumps(fetch_headers)}
+                                    headers: {json.dumps(checkin_fetch_headers)}
                                 }});
                                 return {{ status: r.status, text: await r.text() }};
                             }}

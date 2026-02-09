@@ -436,7 +436,7 @@ class ProviderConfig:
 DEFAULT_PROVIDERS: dict[str, dict] = {
     "anyrouter": {
         "domain": "https://anyrouter.top",
-        "sign_in_path": None,  # anyrouter 无签到 API，通过浏览器访问用户信息页触发自动签到
+        "sign_in_path": "/api/user/sign_in",  # anyrouter 有独立签到 API，必须 POST 调用
         "bypass_method": "waf_cookies",
         "waf_cookie_names": ["acw_tc", "cdn_sec_tc", "acw_sc__v2"],
     },
