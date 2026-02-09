@@ -1513,26 +1513,29 @@ class PlatformManager:
                 synced_providers = await self._try_sync_ldoh_providers(tab, providers_to_test)
                 if synced_providers:
                     providers_to_test = synced_providers
-                    # 业务要求：无论 LDOH 动态结果如何，始终保留 anyrouter 参与后续流程
-                    if "anyrouter" not in providers_to_test:
-                        anyrouter_provider = self.config.providers.get("anyrouter")
-                        if not anyrouter_provider and "anyrouter" in DEFAULT_PROVIDERS:
-                            try:
-                                anyrouter_provider = ProviderConfig.from_dict(
-                                    "anyrouter", DEFAULT_PROVIDERS["anyrouter"]
-                                )
-                            except Exception:
-                                anyrouter_provider = None
-                        if anyrouter_provider:
-                            providers_to_test["anyrouter"] = anyrouter_provider
-                            self._register_runtime_provider("anyrouter", anyrouter_provider)
-                            logger.info("LDOH 同步后强制并入 anyrouter")
-                        else:
-                            logger.warning("LDOH 同步后尝试并入 anyrouter 失败：本地未找到 anyrouter 配置")
                     stats["ldoh_sync_status"] = "success"
                 else:
                     logger.warning("LDOH 同步失败，使用本地兜底站点继续")
                     stats["ldoh_sync_status"] = "fallback_local"
+
+            # 业务要求：无论 LDOH 同步结果如何，始终保留 anyrouter 参与后续流程
+            # anyrouter 因 bypass_method="waf_cookies" 被 _get_local_auto_providers 跳过，
+            # 需要在此处强制补回，确保每轮都能处理 anyrouter 签到
+            if "anyrouter" not in providers_to_test:
+                anyrouter_provider = self.config.providers.get("anyrouter")
+                if not anyrouter_provider and "anyrouter" in DEFAULT_PROVIDERS:
+                    try:
+                        anyrouter_provider = ProviderConfig.from_dict(
+                            "anyrouter", DEFAULT_PROVIDERS["anyrouter"]
+                        )
+                    except Exception:
+                        anyrouter_provider = None
+                if anyrouter_provider:
+                    providers_to_test["anyrouter"] = anyrouter_provider
+                    self._register_runtime_provider("anyrouter", anyrouter_provider)
+                    logger.info("强制并入 anyrouter（确保每轮处理）")
+                else:
+                    logger.warning("尝试并入 anyrouter 失败：本地未找到 anyrouter 配置")
             else:
                 logger.warning("共享会话 LinuxDO 登录失败，后续改为逐站独立 OAuth")
                 stats["ldoh_sync_status"] = "linuxdo_login_failed_fallback_local"
