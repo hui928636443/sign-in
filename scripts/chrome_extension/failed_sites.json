@@ -1,6 +1,22 @@
 {
-  "generated_at": "2026-02-14T02:03:21.541282+00:00",
+  "generated_at": "2026-02-14T13:02:28.414429+00:00",
   "source": "github_actions",
-  "failed_count": 0,
-  "failed_sites": []
+  "failed_count": 1,
+  "failed_sites": [
+    {
+      "provider": "hotaru",
+      "account_name": "主账号_hotaru",
+      "api_user": "",
+      "platform": "NewAPI (hotaru)",
+      "site_url": "https://api.hotaruapi.top",
+      "login_url": "https://api.hotaruapi.top/login",
+      "oauth_login_url": "https://api.hotaruapi.top/auth/login?returnTo=%2F",
+      "reason": "OAuth 登录失败，无法获取 session",
+      "failure_kind": "session_missing",
+      "runtime_cookie_keys": [],
+      "last_url": "",
+      "needs_manual_auth": true,
+      "oauth_cookie_blocked": true
+    }
+  ]
 }
